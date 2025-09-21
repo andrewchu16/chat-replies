@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource
-from pydantic import FieldInfo
+from pydantic.fields import FieldInfo
 from typing import Any
 import json
 
