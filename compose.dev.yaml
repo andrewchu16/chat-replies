@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: chat-replies-db-dev
+    env_file: 
+      - .env.local
     environment:
       POSTGRES_DB: chat_replies_dev
       POSTGRES_USER: postgres
@@ -23,8 +25,10 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: chat-replies-server-dev
+    env_file:
+      - .env.local
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:${DB_PORT:-5432}/chat_replies_dev
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:${DB_PORT:-5432}/chat_replies_dev
       - ENVIRONMENT=development
       - DEBUG=true
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
@@ -48,6 +52,8 @@ services:
       context: ./client
       dockerfile: Dockerfile.dev
     container_name: chat-replies-client-dev
+    env_file:
+      - .env.local
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_SERVER_URL=http://localhost:${SERVER_PORT:-8000}

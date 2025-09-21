@@ -1,6 +1,7 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, func
 
 from ..models import Message, MessageReplyMetadata, Chat
 from ..exceptions import MessageNotFoundError, ChatNotFoundError, DatabaseError, InvalidReplyRangeError
@@ -10,10 +11,10 @@ from .schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate
 class MessageService:
     """Service class for message operations."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
-    def create_message(self, chat_id: str, message_data: MessageCreate) -> Message:
+    async def create_message(self, chat_id: str, message_data: MessageCreate) -> Message:
         """
         Create a new message in a chat.
         
@@ -29,7 +30,8 @@ class MessageService:
             DatabaseError: If database operation fails
         """
         # Verify chat exists
-        chat = self.db.query(Chat).filter(Chat.id == chat_id).first()
+        result = await self.db.execute(select(Chat).where(Chat.id == chat_id))
+        chat = result.scalar_one_or_none()
         if not chat:
             raise ChatNotFoundError(chat_id)
         
@@ -40,14 +42,14 @@ class MessageService:
                 sender=message_data.sender
             )
             self.db.add(message)
-            self.db.commit()
-            self.db.refresh(message)
+            await self.db.commit()
+            await self.db.refresh(message)
             return message
         except IntegrityError as e:
-            self.db.rollback()
+            await self.db.rollback()
             raise DatabaseError(f"Failed to create message: {str(e)}")
     
-    def reply_to_message(self, chat_id: str, message_id: str, reply_data: MessageReply) -> Message:
+    async def reply_to_message(self, chat_id: str, message_id: str, reply_data: MessageReply) -> Message:
         """
         Reply to a specific message with optional reply metadata.
         
@@ -66,16 +68,16 @@ class MessageService:
             DatabaseError: If database operation fails
         """
         # Verify chat exists
-        chat = self.db.query(Chat).filter(Chat.id == chat_id).first()
+        result = await self.db.execute(select(Chat).where(Chat.id == chat_id))
+        chat = result.scalar_one_or_none()
         if not chat:
             raise ChatNotFoundError(chat_id)
         
         # Verify message exists and belongs to the chat
-        original_message = (
-            self.db.query(Message)
-            .filter(Message.id == message_id, Message.chat_id == chat_id)
-            .first()
+        result = await self.db.execute(
+            select(Message).where(Message.id == message_id, Message.chat_id == chat_id)
         )
+        original_message = result.scalar_one_or_none()
         if not original_message:
             raise MessageNotFoundError(message_id)
         
@@ -91,7 +93,7 @@ class MessageService:
                 sender=reply_data.sender
             )
             self.db.add(reply_message)
-            self.db.flush()  # Flush to get the message ID
+            await self.db.flush()  # Flush to get the message ID
             
             # Create reply metadata if provided
             if reply_data.reply_metadata:
@@ -102,14 +104,14 @@ class MessageService:
                 )
                 self.db.add(reply_metadata)
             
-            self.db.commit()
-            self.db.refresh(reply_message)
+            await self.db.commit()
+            await self.db.refresh(reply_message)
             return reply_message
         except IntegrityError as e:
-            self.db.rollback()
+            await self.db.rollback()
             raise DatabaseError(f"Failed to create reply: {str(e)}")
     
-    def get_message(self, chat_id: str, message_id: str) -> Message:
+    async def get_message(self, chat_id: str, message_id: str) -> Message:
         """
         Get a message by ID within a specific chat.
         
@@ -123,16 +125,15 @@ class MessageService:
         Raises:
             MessageNotFoundError: If message is not found
         """
-        message = (
-            self.db.query(Message)
-            .filter(Message.id == message_id, Message.chat_id == chat_id)
-            .first()
+        result = await self.db.execute(
+            select(Message).where(Message.id == message_id, Message.chat_id == chat_id)
         )
+        message = result.scalar_one_or_none()
         if not message:
             raise MessageNotFoundError(message_id)
         return message
     
-    def get_chat_messages(self, chat_id: str, skip: int = 0, limit: int = 100) -> List[Message]:
+    async def get_chat_messages(self, chat_id: str, skip: int = 0, limit: int = 100) -> List[Message]:
         """
         Get all messages in a chat with pagination.
         
@@ -148,20 +149,21 @@ class MessageService:
             ChatNotFoundError: If chat is not found
         """
         # Verify chat exists
-        chat = self.db.query(Chat).filter(Chat.id == chat_id).first()
+        result = await self.db.execute(select(Chat).where(Chat.id == chat_id))
+        chat = result.scalar_one_or_none()
         if not chat:
             raise ChatNotFoundError(chat_id)
         
-        return (
-            self.db.query(Message)
-            .filter(Message.chat_id == chat_id)
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.chat_id == chat_id)
             .order_by(Message.created_at.asc())
             .offset(skip)
             .limit(limit)
-            .all()
         )
+        return result.scalars().all()
     
-    def count_chat_messages(self, chat_id: str) -> int:
+    async def count_chat_messages(self, chat_id: str) -> int:
         """
         Count total messages in a chat.
         
@@ -171,7 +173,10 @@ class MessageService:
         Returns:
             Total number of messages
         """
-        return self.db.query(Message).filter(Message.chat_id == chat_id).count()
+        result = await self.db.execute(
+            select(func.count(Message.id)).where(Message.chat_id == chat_id)
+        )
+        return result.scalar()
     
     def _validate_reply_metadata(self, reply_metadata: MessageReplyMetadataCreate, original_content: str) -> None:
         """

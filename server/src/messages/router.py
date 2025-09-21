@@ -25,7 +25,7 @@ async def send_message(
     Returns:
         Created message data
     """
-    message = message_service.create_message(chat_id, message_data)
+    message = await message_service.create_message(chat_id, message_data)
     return MessageResponse.model_validate(message)
 
 
@@ -48,7 +48,7 @@ async def reply_to_message(
     Returns:
         Created reply message data
     """
-    message = message_service.reply_to_message(chat_id, message_id, reply_data)
+    message = await message_service.reply_to_message(chat_id, message_id, reply_data)
     return MessageResponse.model_validate(message)
 
 
@@ -71,8 +71,8 @@ async def get_chat_messages(
     Returns:
         List of messages with pagination info
     """
-    messages = message_service.get_chat_messages(chat_id, skip, limit)
-    total = message_service.count_chat_messages(chat_id)
+    messages = await message_service.get_chat_messages(chat_id, skip, limit)
+    total = await message_service.count_chat_messages(chat_id)
     
     return MessagesListResponse(
         messages=[MessageResponse.model_validate(msg) for msg in messages],
@@ -97,5 +97,5 @@ async def get_message(
     Returns:
         Message data
     """
-    message = message_service.get_message(chat_id, message_id)
+    message = await message_service.get_message(chat_id, message_id)
     return MessageResponse.model_validate(message)

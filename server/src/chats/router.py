@@ -23,7 +23,7 @@ async def create_chat(
     Returns:
         Created chat data
     """
-    chat = chat_service.create_chat(chat_data)
+    chat = await chat_service.create_chat(chat_data)
     return ChatResponse.model_validate(chat)
 
 
@@ -42,7 +42,7 @@ async def get_chat(
     Returns:
         Chat metadata
     """
-    chat = chat_service.get_chat(chat_id)
+    chat = await chat_service.get_chat(chat_id)
     return ChatResponse.model_validate(chat)
 
 
@@ -63,5 +63,5 @@ async def update_chat(
     Returns:
         Updated chat data
     """
-    chat = chat_service.update_chat(chat_id, chat_data)
+    chat = await chat_service.update_chat(chat_id, chat_data)
     return ChatResponse.model_validate(chat)

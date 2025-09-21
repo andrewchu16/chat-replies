@@ -1,14 +1,13 @@
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource
 from pydantic.fields import FieldInfo
 from typing import Any
-import json
 
 
 class MyCustomSource(EnvSettingsSource):
     def prepare_field_value(
         self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool
     ) -> Any:
-        if field_name == 'allowed_origins':
+        if field_name == 'allowed_origins' and value is not None:
             return value.split(',')
         return value
     
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     """Global application settings."""
     
     # Database
-    database_url: str = "sqlite:///./test.db"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/chatdb"
     
     # Environment
     environment: str = "development"

@@ -1,6 +1,7 @@
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 
 from ..models import Chat
 from ..exceptions import ChatNotFoundError, DatabaseError
@@ -10,10 +11,10 @@ from .schemas import ChatCreate, ChatUpdate
 class ChatService:
     """Service class for chat operations."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
-    def create_chat(self, chat_data: ChatCreate) -> Chat:
+    async def create_chat(self, chat_data: ChatCreate) -> Chat:
         """
         Create a new chat.
         
@@ -29,14 +30,14 @@ class ChatService:
         try:
             chat = Chat(title=chat_data.title)
             self.db.add(chat)
-            self.db.commit()
-            self.db.refresh(chat)
+            await self.db.commit()
+            await self.db.refresh(chat)
             return chat
         except IntegrityError as e:
-            self.db.rollback()
+            await self.db.rollback()
             raise DatabaseError(f"Failed to create chat: {str(e)}")
     
-    def get_chat(self, chat_id: str) -> Chat:
+    async def get_chat(self, chat_id: str) -> Chat:
         """
         Get a chat by ID.
         
@@ -49,12 +50,13 @@ class ChatService:
         Raises:
             ChatNotFoundError: If chat is not found
         """
-        chat = self.db.query(Chat).filter(Chat.id == chat_id).first()
+        result = await self.db.execute(select(Chat).where(Chat.id == chat_id))
+        chat = result.scalar_one_or_none()
         if not chat:
             raise ChatNotFoundError(chat_id)
         return chat
     
-    def update_chat(self, chat_id: str, chat_data: ChatUpdate) -> Chat:
+    async def update_chat(self, chat_id: str, chat_data: ChatUpdate) -> Chat:
         """
         Update chat metadata.
         
@@ -69,21 +71,21 @@ class ChatService:
             ChatNotFoundError: If chat is not found
             DatabaseError: If database operation fails
         """
-        chat = self.get_chat(chat_id)
+        chat = await self.get_chat(chat_id)
         
         try:
             # Update only provided fields
             if chat_data.title is not None:
                 chat.title = chat_data.title
             
-            self.db.commit()
-            self.db.refresh(chat)
+            await self.db.commit()
+            await self.db.refresh(chat)
             return chat
         except IntegrityError as e:
-            self.db.rollback()
+            await self.db.rollback()
             raise DatabaseError(f"Failed to update chat: {str(e)}")
     
-    def delete_chat(self, chat_id: str) -> None:
+    async def delete_chat(self, chat_id: str) -> None:
         """
         Delete a chat.
         
@@ -94,16 +96,16 @@ class ChatService:
             ChatNotFoundError: If chat is not found
             DatabaseError: If database operation fails
         """
-        chat = self.get_chat(chat_id)
+        chat = await self.get_chat(chat_id)
         
         try:
-            self.db.delete(chat)
-            self.db.commit()
+            await self.db.delete(chat)
+            await self.db.commit()
         except IntegrityError as e:
-            self.db.rollback()
+            await self.db.rollback()
             raise DatabaseError(f"Failed to delete chat: {str(e)}")
     
-    def list_chats(self, skip: int = 0, limit: int = 100) -> List[Chat]:
+    async def list_chats(self, skip: int = 0, limit: int = 100) -> List[Chat]:
         """
         List chats with pagination.
         
@@ -114,10 +116,10 @@ class ChatService:
         Returns:
             List of chat objects
         """
-        return (
-            self.db.query(Chat)
+        result = await self.db.execute(
+            select(Chat)
             .order_by(Chat.created_at.desc())
             .offset(skip)
             .limit(limit)
-            .all()
         )
+        return result.scalars().all()

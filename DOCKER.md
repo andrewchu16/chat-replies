@@ -22,12 +22,12 @@ This project includes Docker configuration for both development and production e
 
 1. Copy the environment file:
    ```bash
-   cp .env.local.example .env.local
+   cp .env.example .env.local
    ```
 
 2. Start the development environment:
    ```bash
-   docker compose -f compose.dev.yaml up --build --env-file .env.local
+   docker compose -f compose.dev.yaml up --build -w
    ```
 
 ## Database Management

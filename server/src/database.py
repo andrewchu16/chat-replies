@@ -1,31 +1,43 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from typing import AsyncGenerator
 
 from .config import settings
 
-# Create database engine
-engine = create_engine(
+# Create async engine
+engine = create_async_engine(
     settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {}
+    echo=settings.debug,
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create async session factory
+async_session = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 # Create base class for models
 Base = declarative_base()
 
 
-def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    async with async_session() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
-def create_tables():
+async def create_tables():
     """Create all tables in the database."""
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def close_db():
+    """Close database connections."""
+    await engine.dispose()

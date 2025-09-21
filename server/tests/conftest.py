@@ -1,47 +1,57 @@
 """Pytest configuration and fixtures."""
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.main import app
 from src.database import get_db, Base
 
-# Use in-memory SQLite for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Use in-memory SQLite for testing with asyncpg-like syntax
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-engine = create_engine(
+engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
+    echo=True,
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
-def override_get_db():
+async def override_get_db():
     """Override database dependency for testing."""
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
+    async with TestingSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
 app.dependency_overrides[get_db] = override_get_db
 
 
-@pytest.fixture
-def db():
+@pytest_asyncio.fixture
+async def db():
     """Create a fresh database for each test."""
-    Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    async with TestingSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
@@ -49,6 +59,13 @@ def client():
     """Create a test client."""
     with TestClient(app) as c:
         yield c
+
+
+@pytest_asyncio.fixture
+async def async_client():
+    """Create an async test client."""
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
 
 
 @pytest.fixture
