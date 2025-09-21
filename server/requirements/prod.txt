@@ -1,0 +1,13 @@
+# Include base requirements
+-r base.txt
+
+# Production server (using uvicorn from base.txt)
+
+# Production database drivers
+psycopg2-binary==2.9.9
+
+# Monitoring and logging
+structlog==23.2.0
+
+# Production security
+cryptography==41.0.7

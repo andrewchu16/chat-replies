@@ -1,0 +1,33 @@
+# Ignore Dockerfile and dockerignore
+Dockerfile
+.dockerignore
+
+# Ignore Python cache and virtual environments
+__pycache__/
+.venv/
+.conda/
+
+# Ignore testing and coverage
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+
+# Ignore environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Ignore documentation
+README.md

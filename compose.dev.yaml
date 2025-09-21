@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-replies-db-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chat_replies_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-chat_replies_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chat-replies-server-dev
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-chat_replies_dev}
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - db-network
+      - chat-network
+    develop:
+      watch:
+        - action: sync
+          path: ./server/src
+          target: /app/src
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: chat-replies-client-dev
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8000}
+    ports:
+      - "${CLIENT_PORT:-3000}:3000"
+    command: ["npm", "run", "dev"]
+    networks:
+      - chat-network
+    develop:
+      watch:
+        - action: sync
+          path: ./client
+          target: /app
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
+  db-network:
+    driver: bridge

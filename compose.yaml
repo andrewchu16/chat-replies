@@ -1,0 +1,74 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-replies-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chat_replies}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-chat_replies}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chat-replies-server
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-chat_replies}
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - ALLOWED_ORIGINS=http://localhost:3000,http://client:3000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - chat-network
+      - db-network
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: chat-replies-client
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8000}
+      - NEXT_PUBLIC_SERVER_URL=http://server:8000
+    ports:
+      - "${CLIENT_PORT:-3000}:3000"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - chat-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
+  db-network:
+    driver: bridge

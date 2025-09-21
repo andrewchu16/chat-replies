@@ -1,0 +1,28 @@
+# Ignore Dockerfile and dockerignore to prevent them from being included in the image
+Dockerfile
+.dockerignore
+
+# Ignore node_modules to avoid copying dependencies into the Docker image
+node_modules
+
+# Ignore npm debug logs
+npm-debug.log
+
+# Ignore README file as it's not needed in the Docker image
+README.md
+
+# Ignore Next.js build output
+.next
+
+# Ignore Git repository files
+.git
+.gitignore
+
+# Ignore Vercel deployment files
+.vercel
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore TypeScript build info files
+*.tsbuildinfo
