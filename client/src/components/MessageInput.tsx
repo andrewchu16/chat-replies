@@ -67,11 +67,11 @@ export default function MessageInput({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message (Shift+Enter for new line)"
+          placeholder="Ask, &quot;Give me a step-by-step guide to machine learning from scratch.&quot;"
           className={`max-h-32 pt-2 px-2 outline-none bg-transparent placeholder-black/30 resize-none ${
             rowCount >= 3 ? "overflow-auto custom-scrollbar" : "overflow-hidden"
           }`}
-          rows={1}
+          rows={2}
           disabled={disabled}
         />
         <div className="flex justify-end">
