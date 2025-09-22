@@ -24,3 +24,13 @@ body {
   color: #000000;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom animations for streaming indicators */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.streaming-cursor {
+  animation: cursor-blink 1s infinite;
+}
