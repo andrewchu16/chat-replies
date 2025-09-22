@@ -1,11 +1,13 @@
-from typing import List, Optional
+from typing import List, AsyncGenerator, Optional
+import asyncio
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, func
 
-from ..models import Message, MessageReplyMetadata, Chat
+from ..models import Message, MessageReplyMetadata, Chat, SenderType
 from ..exceptions import MessageNotFoundError, ChatNotFoundError, DatabaseError, InvalidReplyRangeError
-from .schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate
+from .schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate, StreamChunk
 
 
 class MessageService:
@@ -200,3 +202,212 @@ class MessageService:
         
         if reply_metadata.start_index < 0:
             raise InvalidReplyRangeError(reply_metadata.start_index, reply_metadata.end_index)
+    
+    async def create_message_with_streaming_response(
+        self, 
+        chat_id: str, 
+        user_message_data: MessageCreate
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Create a user message and stream an AI response.
+        
+        Args:
+            chat_id: Chat ID
+            user_message_data: User message data
+            
+        Yields:
+            StreamChunk objects containing the AI response
+            
+        Raises:
+            ChatNotFoundError: If chat is not found
+            DatabaseError: If database operation fails
+        """
+        # First, create the user message
+        user_message = await self.create_message(chat_id, user_message_data)
+        
+        # Generate AI response content (simulate streaming)
+        ai_response_content = await self._generate_ai_response(user_message.content)
+        
+        # Stream the AI response
+        message_id = str(uuid.uuid4())
+        accumulated_content = ""
+        
+        # Split the response into chunks for streaming
+        words = ai_response_content.split()
+        chunk_size = 3  # Stream 3 words at a time
+        
+        for i in range(0, len(words), chunk_size):
+            chunk_words = words[i:i + chunk_size]
+            chunk_content = " ".join(chunk_words)
+            accumulated_content += chunk_content + " "
+            
+            is_final = i + chunk_size >= len(words)
+            
+            yield StreamChunk(
+                content=chunk_content,
+                is_final=is_final,
+                message_id=message_id
+            )
+            
+            # Simulate processing delay
+            await asyncio.sleep(0.1)
+        
+        # Create the AI message in the database
+        try:
+            ai_message = Message(
+                id=message_id,
+                chat_id=chat_id,
+                content=ai_response_content.strip(),
+                sender=SenderType.AI
+            )
+            self.db.add(ai_message)
+            await self.db.commit()
+            await self.db.refresh(ai_message)
+        except IntegrityError as e:
+            await self.db.rollback()
+            raise DatabaseError(f"Failed to create AI message: {str(e)}")
+    
+    async def _generate_ai_response(self, user_content: str) -> str:
+        """
+        Generate an AI response to user content.
+        This is a placeholder implementation that simulates AI response generation.
+        
+        Args:
+            user_content: The user's message content
+            
+        Returns:
+            Generated AI response
+        """
+        # Simulate AI processing time
+        await asyncio.sleep(0.5)
+        
+        # Simple response generation (replace with actual AI service)
+        responses = [
+            f"I understand you said: '{user_content}'. Let me help you with that.",
+            f"That's an interesting question about '{user_content}'. Here's what I think...",
+            f"Thanks for sharing '{user_content}'. I'd be happy to discuss this further.",
+            f"Regarding '{user_content}', I have some thoughts that might be helpful.",
+            f"I see you're asking about '{user_content}'. Let me provide some insights."
+        ]
+        
+        # Simple hash-based selection for consistent responses
+        response_index = hash(user_content) % len(responses)
+        return responses[response_index]
+    
+    async def reply_to_message_with_streaming_response(
+        self, 
+        chat_id: str, 
+        message_id: str, 
+        reply_data: MessageReply
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Reply to a message and stream an AI response.
+        
+        Args:
+            chat_id: Chat ID
+            message_id: Message ID to reply to
+            reply_data: Reply data
+            
+        Yields:
+            StreamChunk objects containing the AI response
+            
+        Raises:
+            ChatNotFoundError: If chat is not found
+            MessageNotFoundError: If message is not found
+            InvalidReplyRangeError: If reply range is invalid
+            DatabaseError: If database operation fails
+        """
+        # First, create the user reply message
+        await self.reply_to_message(chat_id, message_id, reply_data)
+        
+        # Get the original message for context
+        original_message = await self.get_message(chat_id, message_id)
+        
+        # Generate AI response content based on the reply context
+        ai_response_content = await self._generate_ai_reply_response(
+            original_message.content, 
+            reply_data.content,
+            reply_data.reply_metadata
+        )
+        
+        # Stream the AI response
+        ai_message_id = str(uuid.uuid4())
+        
+        # Split the response into chunks for streaming
+        words = ai_response_content.split()
+        chunk_size = 3  # Stream 3 words at a time
+        
+        for i in range(0, len(words), chunk_size):
+            chunk_words = words[i:i + chunk_size]
+            chunk_content = " ".join(chunk_words)
+            
+            is_final = i + chunk_size >= len(words)
+            
+            yield StreamChunk(
+                content=chunk_content,
+                is_final=is_final,
+                message_id=ai_message_id
+            )
+            
+            # Simulate processing delay
+            await asyncio.sleep(0.1)
+        
+        # Create the AI message in the database
+        try:
+            ai_message = Message(
+                id=ai_message_id,
+                chat_id=chat_id,
+                content=ai_response_content.strip(),
+                sender=SenderType.AI
+            )
+            self.db.add(ai_message)
+            await self.db.commit()
+            await self.db.refresh(ai_message)
+        except IntegrityError as e:
+            await self.db.rollback()
+            raise DatabaseError(f"Failed to create AI reply message: {str(e)}")
+    
+    async def _generate_ai_reply_response(
+        self, 
+        original_content: str, 
+        reply_content: str, 
+        reply_metadata: Optional[MessageReplyMetadataCreate]
+    ) -> str:
+        """
+        Generate an AI response to a reply message.
+        This is a placeholder implementation that simulates AI response generation.
+        
+        Args:
+            original_content: The original message content
+            reply_content: The user's reply content
+            reply_metadata: Optional reply metadata
+            
+        Returns:
+            Generated AI response
+        """
+        # Simulate AI processing time
+        await asyncio.sleep(0.5)
+        
+        # Create context-aware responses
+        if reply_metadata:
+            # Extract the specific text being replied to
+            referenced_text = original_content[reply_metadata.start_index:reply_metadata.end_index]
+            responses = [
+                f"I see you're responding to '{referenced_text}' with '{reply_content}'. That's an interesting perspective.",
+                f"Regarding your reply '{reply_content}' to '{referenced_text}', I think you make a good point.",
+                f"Your response '{reply_content}' to the part about '{referenced_text}' raises some important questions.",
+                f"I understand your reply '{reply_content}' to '{referenced_text}'. Let me add some thoughts...",
+                f"Good point about '{referenced_text}'. Your reply '{reply_content}' makes me think of..."
+            ]
+        else:
+            responses = [
+                f"I see you replied '{reply_content}' to the message about '{original_content[:50]}...'. That's insightful.",
+                f"Your reply '{reply_content}' to the previous message shows good understanding.",
+                f"Thanks for your response '{reply_content}'. Building on that idea...",
+                f"I appreciate your reply '{reply_content}'. This reminds me of...",
+                f"Your response '{reply_content}' adds valuable context to our discussion."
+            ]
+        
+        # Simple hash-based selection for consistent responses
+        response_index = hash(reply_content + original_content) % len(responses)
+        return responses[response_index]

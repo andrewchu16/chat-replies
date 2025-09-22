@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
-from enum import Enum
 
 from ..models import SenderType
 
@@ -85,5 +84,21 @@ class MessagesListResponse(BaseModel):
             "example": {
                 "messages": [],
                 "total": 0
+            }
+        }
+
+
+class StreamChunk(BaseModel):
+    """Schema for streaming message chunks."""
+    content: str = Field(..., description="Chunk of message content")
+    is_final: bool = Field(False, description="Whether this is the final chunk")
+    message_id: Optional[str] = Field(None, description="Message ID (only in final chunk)")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "content": "Hello",
+                "is_final": False,
+                "message_id": None
             }
         }
