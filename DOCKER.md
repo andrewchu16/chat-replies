@@ -8,21 +8,21 @@ This project includes Docker configuration for both development and production e
 
 1. Copy the environment file:
    ```bash
-   cp .env.example .env
+   cp .env.prod.example .env.prod
    ```
 
 2. Update the `.env` file with your desired configuration.
 
 3. Build and start all services:
    ```bash
-   docker compose up --build
+   docker compose -f compose.prod.yaml up --build
    ```
 
 ### Development Environment
 
 1. Copy the environment file:
    ```bash
-   cp .env.example .env.local
+   cp .env.local.example .env.local
    ```
 
 2. Start the development environment:

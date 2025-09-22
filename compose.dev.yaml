@@ -5,15 +5,15 @@ services:
     env_file: 
       - .env.local
     environment:
-      POSTGRES_DB: chat_replies_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-chat_replies_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d chat_replies_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-chat_replies_dev}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,10 +28,10 @@ services:
     env_file:
       - .env.local
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:${POSTGRES_PORT:-5432}/chat_replies_dev
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-chat_replies_dev}
       - ENVIRONMENT=development
       - DEBUG=true
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+      - ALLOWED_ORIGINS=http://${CLIENT_HOST:-localhost}:${CLIENT_PORT:-3000},http://client:3000
     ports:
       - "${SERVER_PORT:-8000}:8000"
     depends_on:
@@ -56,7 +56,7 @@ services:
       - .env.local
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_SERVER_URL=http://localhost:${SERVER_PORT:-8000}
+      - NEXT_PUBLIC_SERVER_URL=${SERVER_HOST:-localhost}:${SERVER_PORT:-8000}
     ports:
       - "${CLIENT_PORT:-3000}:3000"
     command: ["npm", "run", "dev"]
