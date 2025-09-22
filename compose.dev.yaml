@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d chat_replies_dev"]
       interval: 10s
@@ -28,7 +28,7 @@ services:
     env_file:
       - .env.local
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:${DB_PORT:-5432}/chat_replies_dev
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:${POSTGRES_PORT:-5432}/chat_replies_dev
       - ENVIRONMENT=development
       - DEBUG=true
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
