@@ -57,7 +57,6 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_SERVER_URL=http://localhost:${SERVER_PORT:-8000}
-      - PRIVATE_SERVER_URL=http://server:8000
     ports:
       - "${CLIENT_PORT:-3000}:3000"
     command: ["npm", "run", "dev"]
