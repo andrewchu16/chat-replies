@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
+from .config import settings
 from .chats.router import router as chats_router
 from .messages.router import router as messages_router
-from .config import settings
 from .database import create_tables, close_db
 
 

@@ -39,3 +39,13 @@ class DatabaseError(HTTPException):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=detail
         )
+
+
+class DevelopmentEnvironmentRequiredError(HTTPException):
+    """Exception raised when development environment is required."""
+    
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Development environment is required"
+        )
