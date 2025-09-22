@@ -54,3 +54,4 @@ def test_update_nonexistent_chat(client: TestClient):
     update_data = {"title": "Updated Chat Title"}
     response = client.put("/chats/nonexistent-id", json=update_data)
     assert response.status_code == 404
+

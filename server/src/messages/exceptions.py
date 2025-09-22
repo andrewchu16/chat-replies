@@ -39,3 +39,4 @@ class ReplyMetadataOutOfBoundsError(HTTPException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Reply range ({start_index}-{end_index}) is out of bounds for content length {content_length}"
         )
+

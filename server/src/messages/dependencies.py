@@ -8,3 +8,4 @@ from .service import MessageService
 def get_message_service(db: AsyncSession = Depends(get_db)) -> MessageService:
     """Dependency to get message service instance."""
     return MessageService(db)
+

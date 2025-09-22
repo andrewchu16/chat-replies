@@ -7,3 +7,4 @@ MIN_CHAT_TITLE_LENGTH = 1
 # Pagination defaults
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+

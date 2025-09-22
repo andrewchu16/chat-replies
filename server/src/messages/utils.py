@@ -74,3 +74,4 @@ def format_message_preview(content: str, max_length: int = 50) -> str:
         formatted = formatted[:max_length - 3] + "..."
     
     return formatted
+

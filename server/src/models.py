@@ -57,3 +57,4 @@ class MessageReplyMetadata(Base):
     
     # Relationships
     message = relationship("Message", back_populates="reply_metadata")
+

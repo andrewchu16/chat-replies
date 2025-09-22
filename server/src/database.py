@@ -41,3 +41,4 @@ async def create_tables():
 async def close_db():
     """Close database connections."""
     await engine.dispose()
+

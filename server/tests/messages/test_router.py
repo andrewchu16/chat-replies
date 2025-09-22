@@ -92,3 +92,4 @@ def test_get_nonexistent_message(client: TestClient, sample_chat_data):
     
     response = client.get(f"/chats/{chat_id}/messages/nonexistent-id")
     assert response.status_code == 404
+

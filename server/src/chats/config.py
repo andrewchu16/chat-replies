@@ -17,3 +17,4 @@ class ChatsConfig(BaseSettings):
 
 
 chats_config = ChatsConfig()
+

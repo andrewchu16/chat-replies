@@ -21,3 +21,4 @@ watchfiles==0.21.0
 
 # Environment management
 python-dotenv==1.0.0
+

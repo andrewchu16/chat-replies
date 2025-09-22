@@ -20,3 +20,4 @@ class MessagesConfig(BaseSettings):
 
 
 messages_config = MessagesConfig()
+

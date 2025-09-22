@@ -130,3 +130,4 @@ class ChatService:
         chats = result.scalars().all()
         
         return list(chats), total
+

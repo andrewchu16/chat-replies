@@ -77,3 +77,4 @@ def paginate(query: Query, page: int, size: int) -> PaginatedResponse:
         has_next=page < pages,
         has_previous=page > 1
     )
+

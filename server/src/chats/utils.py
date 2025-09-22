@@ -43,3 +43,4 @@ def validate_chat_title(title: Optional[str]) -> bool:
     
     title = title.strip()
     return 1 <= len(title) <= 255
+
