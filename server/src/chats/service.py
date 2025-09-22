@@ -1,7 +1,7 @@
-from typing import Optional, List
+from typing import List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from ..models import Chat
 from ..exceptions import ChatNotFoundError, DatabaseError
@@ -105,7 +105,7 @@ class ChatService:
             await self.db.rollback()
             raise DatabaseError(f"Failed to delete chat: {str(e)}")
     
-    async def list_chats(self, skip: int = 0, limit: int = 100) -> List[Chat]:
+    async def list_chats(self, skip: int = 0, limit: int = 100) -> Tuple[List[Chat], int]:
         """
         List chats with pagination.
         
@@ -114,12 +114,19 @@ class ChatService:
             limit: Maximum number of chats to return
             
         Returns:
-            List of chat objects
+            Tuple of (list of chat objects, total count)
         """
+        # Get total count
+        count_result = await self.db.execute(select(func.count(Chat.id)))
+        total = count_result.scalar() or 0
+        
+        # Get paginated chats
         result = await self.db.execute(
             select(Chat)
             .order_by(Chat.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
-        return result.scalars().all()
+        chats = result.scalars().all()
+        
+        return list(chats), total
