@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .config import settings
@@ -8,7 +9,7 @@ from .database import create_tables, close_db
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     # Startup
     await create_tables()
     yield
@@ -22,6 +23,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     openapi_url="/openapi.json" if settings.debug else None
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
