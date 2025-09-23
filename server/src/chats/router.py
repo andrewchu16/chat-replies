@@ -4,7 +4,7 @@ from .schemas import ChatCreate, ChatUpdate, ChatResponse
 from .service import ChatService
 from .dependencies import get_chat_service
 from ..pagination import PaginatedResponse
-from ..dependencies import require_development
+from ..dependencies import require_dev_environment
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ async def list_chats(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     size: int = Query(20, ge=1, le=100, description="Number of items per page"),
     chat_service: ChatService = Depends(get_chat_service),
-    require_development: None = Depends(require_development)
+    _: None = Depends(require_dev_environment)
 ) -> PaginatedResponse[ChatResponse]:
     """
     List all chats with pagination.
@@ -110,7 +110,7 @@ async def update_chat(
 async def delete_chat(
     chat_id: str,
     chat_service: ChatService = Depends(get_chat_service),
-    require_development: None = Depends(require_development)
+    _: None = Depends(require_dev_environment)
 ) -> None:
     """
     Delete a chat by ID.

@@ -1,12 +1,13 @@
-from typing import List, AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional
 import asyncio
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select, func
+from sqlalchemy import select
+from sqlalchemy import func as sa_func
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
-
+from langchain_core.messages import BaseMessage as LCBaseMessage, HumanMessage as LCHumanMessage, AIMessage as LCAIMessage, SystemMessage as LCSystemMessage
 from ..models import Message, MessageReplyMetadata, Chat, SenderType
 from ..exceptions import MessageNotFoundError, ChatNotFoundError, DatabaseError, InvalidReplyRangeError
 from .schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate, StreamChunk
@@ -22,7 +23,7 @@ class MessageService:
     @property
     def llm(self) -> BaseChatModel:
         if self._llm is None:
-            self._llm = ChatOpenAI(model="openai:gpt-4o-mini")
+            self._llm = ChatOpenAI(model="openai:gpt-5-nano")
         return self._llm
     
     async def create_message(self, chat_id: str, message_data: MessageCreate) -> Message:
@@ -59,7 +60,7 @@ class MessageService:
         except IntegrityError as e:
             await self.db.rollback()
             raise DatabaseError(f"Failed to create message: {str(e)}")
-    
+        
     async def reply_to_message(self, chat_id: str, message_id: str, reply_data: MessageReply) -> Message:
         """
         Reply to a specific message with optional reply metadata.
@@ -144,7 +145,7 @@ class MessageService:
             raise MessageNotFoundError(message_id)
         return message
     
-    async def get_chat_messages(self, chat_id: str, skip: int = 0, limit: int = 100) -> List[Message]:
+    async def get_chat_messages(self, chat_id: str, skip: int = 0, limit: int = 100) -> list[Message]:
         """
         Get all messages in a chat with pagination.
         
@@ -154,7 +155,7 @@ class MessageService:
             limit: Maximum number of messages to return
             
         Returns:
-            List of message objects
+            list of message objects
             
         Raises:
             ChatNotFoundError: If chat is not found
@@ -185,7 +186,7 @@ class MessageService:
             Total number of messages
         """
         result = await self.db.execute(
-            select(func.count(Message.id)).where(Message.chat_id == chat_id)
+            select(sa_func.count(Message.id)).where(Message.chat_id == chat_id)
         )
         return result.scalar()
     
@@ -232,78 +233,111 @@ class MessageService:
             DatabaseError: If database operation fails
         """
         # First, create the user message
-        user_message = await self.create_message(chat_id, user_message_data)
+        await self.create_message(chat_id, user_message_data)
         
-        # Generate AI response content (simulate streaming)
-        ai_response_content = await self._generate_ai_response(user_message.content)
-        
-        # Stream the AI response
+        # Build chat history context using the last 10 messages (including the new one)
+        recent_messages = await self._get_last_chat_messages(chat_id, limit=10)
+        messages_for_llm = self._build_chat_history_messages(
+            recent_messages,
+            system_preamble=(
+                "You are ChatReplies assistant. Use the conversation history to respond helpfully and concisely."
+            )
+        )
+
+        # Stream the AI response directly from the LLM
         message_id = str(uuid.uuid4())
         accumulated_content = ""
-        
-        # Split the response into chunks for streaming
-        words = ai_response_content.split()
-        chunk_size = 3  # Stream 3 words at a time
-        
-        for i in range(0, len(words), chunk_size):
-            chunk_words = words[i:i + chunk_size]
-            chunk_content = " ".join(chunk_words)
-            accumulated_content += chunk_content + " "
-            
-            is_final = i + chunk_size >= len(words)
-            
-            yield StreamChunk(
-                content=chunk_content,
-                is_final=is_final,
-                message_id=message_id
-            )
-            
-            # Simulate processing delay
-            await asyncio.sleep(0.1)
-        
-        # Create the AI message in the database
         try:
-            ai_message = Message(
-                id=message_id,
-                chat_id=chat_id,
-                content=ai_response_content.strip(),
-                sender=SenderType.AI
-            )
-            self.db.add(ai_message)
-            await self.db.commit()
-            await self.db.refresh(ai_message)
-        except IntegrityError as e:
-            await self.db.rollback()
-            raise DatabaseError(f"Failed to create AI message: {str(e)}")
-    
-    async def _generate_ai_response(self, user_content: str) -> str:
+            async for llm_chunk in self._stream_ai_response(messages_for_llm):
+                accumulated_content += llm_chunk
+                yield StreamChunk(
+                    content=llm_chunk,
+                    is_final=False,
+                    message_id=message_id
+                )
+        finally:
+            # After streaming completes (or is interrupted), persist what we have
+            try:
+                if accumulated_content.strip():
+                    ai_message = Message(
+                        id=message_id,
+                        chat_id=chat_id,
+                        content=accumulated_content.strip(),
+                        sender=SenderType.AI
+                    )
+                    self.db.add(ai_message)
+                    await self.db.commit()
+                    await self.db.refresh(ai_message)
+                else:
+                    # Ensure we don't leave open transactions
+                    await self.db.rollback()
+            except IntegrityError as e:
+                await self.db.rollback()
+                raise DatabaseError(f"Failed to create AI message: {str(e)}")
+
+        # Send a final terminator chunk
+        yield StreamChunk(
+            content="",
+            is_final=True,
+            message_id=message_id
+        )
+
+    async def _stream_ai_response(self, messages: list[LCBaseMessage]) -> AsyncGenerator[str, None]:
         """
-        Generate an AI response to user content.
-        This is a placeholder implementation that simulates AI response generation.
-        
-        Args:
-            user_content: The user's message content
-            
-        Returns:
-            Generated AI response
+        Stream an AI response incrementally, yielding content chunks as they arrive.
         """
-        # Simulate AI processing time
-        await asyncio.sleep(0.5)
-        
-        print(f"User content: {user_content[:50]}...")
-        
-        # Simple response generation (replace with actual AI service)
-        responses = [
-            f"I understand you said: '{user_content}'. Let me help you with that.",
-            f"That's an interesting question about '{user_content}'. Here's what I think...",
-            f"Thanks for sharing '{user_content}'. I'd be happy to discuss this further.",
-            f"Regarding '{user_content}', I have some thoughts that might be helpful.",
-            f"I see you're asking about '{user_content}'. Let me provide some insights."
-        ]
-        
-        # Simple hash-based selection for consistent responses
-        response_index = hash(user_content) % len(responses)
-        return responses[response_index]
+        async for chunk in self.llm.astream(messages):
+            # LangChain's astream yields chunks with incremental .content
+            if chunk.content:
+                yield chunk.content
+
+    async def _get_last_chat_messages(self, chat_id: str, limit: int = 10) -> list[Message]:
+        """
+        Fetch the most recent messages in a chat, limited by the provided count.
+        Returns messages in chronological order (oldest to newest).
+        """
+        # Verify chat exists
+        result = await self.db.execute(select(Chat).where(Chat.id == chat_id))
+        chat = result.scalar_one_or_none()
+        if not chat:
+            raise ChatNotFoundError(chat_id)
+
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.chat_id == chat_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        messages_desc = result.scalars().all()
+        # Return in chronological order
+        return list(reversed(messages_desc))
+
+    def _build_chat_history_messages(
+        self,
+        messages: list[Message],
+        *,
+        system_preamble: Optional[str] = None,
+        extra_system_notes: Optional[str] = None,
+    ) -> list[LCBaseMessage]:
+        """
+        Convert persisted messages to LangChain BaseMessage list in chronological order.
+        Optionally prepend a SystemMessage with guidance and notes.
+        """
+        chat_messages: list[LCBaseMessage] = []
+        if system_preamble or extra_system_notes:
+            parts: list[str] = []
+            if system_preamble:
+                parts.append(system_preamble)
+            if extra_system_notes:
+                parts.append(extra_system_notes)
+            chat_messages.append(LCSystemMessage(content="\n\n".join(parts)))
+
+        for msg in messages:
+            if msg.sender == SenderType.USER:
+                chat_messages.append(LCHumanMessage(content=msg.content))
+            else:
+                chat_messages.append(LCAIMessage(content=msg.content))
+        return chat_messages
     
     async def reply_to_message_with_streaming_response(
         self, 
@@ -333,92 +367,99 @@ class MessageService:
         
         # Get the original message for context
         original_message = await self.get_message(chat_id, message_id)
-        
-        # Generate AI response content based on the reply context
-        ai_response_content = await self._generate_ai_reply_response(
-            original_message.content, 
-            reply_data.content,
-            reply_data.reply_metadata
+
+        # Build chat history context using the last 10 messages (including the new reply)
+        recent_messages = await self._get_last_chat_messages(chat_id, limit=10)
+        if reply_data.reply_metadata:
+            referenced_text = original_message.content[
+                reply_data.reply_metadata.start_index:reply_data.reply_metadata.end_index
+            ]
+            extra_notes = (
+                f"The user replied specifically to this text: '{referenced_text}'. "
+                f"Their reply content was: '{reply_data.content}'. Respond accordingly."
+            )
+        else:
+            extra_notes = (
+                f"The user replied to the previous message with: '{reply_data.content}'. Respond accordingly."
+            )
+        messages_for_llm = self._build_chat_history_messages(
+            recent_messages,
+            system_preamble=(
+                "You are ChatReplies assistant. Use the conversation history to respond helpfully and concisely."
+            ),
+            extra_system_notes=extra_notes,
         )
-        
-        # Stream the AI response
+
+        # Stream the AI response directly from the LLM
         ai_message_id = str(uuid.uuid4())
-        
-        # Split the response into chunks for streaming
-        words = ai_response_content.split()
-        chunk_size = 3  # Stream 3 words at a time
-        
-        for i in range(0, len(words), chunk_size):
-            chunk_words = words[i:i + chunk_size]
-            chunk_content = " ".join(chunk_words)
-            
-            is_final = i + chunk_size >= len(words)
-            
-            yield StreamChunk(
-                content=chunk_content,
-                is_final=is_final,
-                message_id=ai_message_id
-            )
-            
-            # Simulate processing delay
-            await asyncio.sleep(0.1)
-        
-        # Create the AI message in the database
+        accumulated_content = ""
         try:
-            ai_message = Message(
-                id=ai_message_id,
-                chat_id=chat_id,
-                content=ai_response_content.strip(),
-                sender=SenderType.AI
-            )
-            self.db.add(ai_message)
-            await self.db.commit()
-            await self.db.refresh(ai_message)
-        except IntegrityError as e:
-            await self.db.rollback()
-            raise DatabaseError(f"Failed to create AI reply message: {str(e)}")
+            async for llm_chunk in self._stream_ai_response(messages_for_llm):
+                accumulated_content += llm_chunk
+                yield StreamChunk(
+                    content=llm_chunk,
+                    is_final=False,
+                    message_id=ai_message_id
+                )
+        finally:
+            # After streaming completes (or is interrupted), persist what we have
+            try:
+                if accumulated_content.strip():
+                    ai_message = Message(
+                        id=ai_message_id,
+                        chat_id=chat_id,
+                        content=accumulated_content.strip(),
+                        sender=SenderType.AI
+                    )
+                    self.db.add(ai_message)
+                    await self.db.commit()
+                    await self.db.refresh(ai_message)
+                else:
+                    await self.db.rollback()
+            except IntegrityError as e:
+                await self.db.rollback()
+                raise DatabaseError(f"Failed to create AI reply message: {str(e)}")
+
+        # Send a final terminator chunk
+        yield StreamChunk(
+            content="",
+            is_final=True,
+            message_id=ai_message_id
+        )
     
-    async def _generate_ai_reply_response(
+    async def _stream_ai_reply_response(
         self, 
         original_content: str, 
         reply_content: str, 
         reply_metadata: Optional[MessageReplyMetadataCreate]
-    ) -> str:
+    ) -> AsyncGenerator[str, None]:
         """
-        Generate an AI response to a reply message.
-        This is a placeholder implementation that simulates AI response generation.
-        
-        Args:
-            original_content: The original message content
-            reply_content: The user's reply content
-            reply_metadata: Optional reply metadata
-            
-        Returns:
-            Generated AI response
+        Stream an AI response that specifically addresses the user's reply content
+        in the context of the referenced original message text when provided.
         """
-        # Simulate AI processing time
-        await asyncio.sleep(0.5)
-        
-        # Create context-aware responses
+        system_preamble = (
+            "You are ChatReplies assistant. You must reply directly and specifically to the user's "
+            "reply content, taking into account the referenced portion of the original message if given. "
+            "Be helpful and concise."
+        )
+
         if reply_metadata:
-            # Extract the specific text being replied to
             referenced_text = original_content[reply_metadata.start_index:reply_metadata.end_index]
-            responses = [
-                f"I see you're responding to '{referenced_text}' with '{reply_content}'. That's an interesting perspective.",
-                f"Regarding your reply '{reply_content}' to '{referenced_text}', I think you make a good point.",
-                f"Your response '{reply_content}' to the part about '{referenced_text}' raises some important questions.",
-                f"I understand your reply '{reply_content}' to '{referenced_text}'. Let me add some thoughts...",
-                f"Good point about '{referenced_text}'. Your reply '{reply_content}' makes me think of..."
-            ]
+            extra_notes = (
+                f"The user replied specifically to this text: '{referenced_text}'. "
+                f"Their reply content was: '{reply_content}'. Respond specifically to their reply content in this context."
+            )
         else:
-            responses = [
-                f"I see you replied '{reply_content}' to the message about '{original_content[:50]}...'. That's insightful.",
-                f"Your reply '{reply_content}' to the previous message shows good understanding.",
-                f"Thanks for your response '{reply_content}'. Building on that idea...",
-                f"I appreciate your reply '{reply_content}'. This reminds me of...",
-                f"Your response '{reply_content}' adds valuable context to our discussion."
-            ]
-        
-        # Simple hash-based selection for consistent responses
-        response_index = hash(reply_content + original_content) % len(responses)
-        return responses[response_index]
+            extra_notes = (
+                f"The user replied to the previous message with: '{reply_content}'. "
+                f"Respond specifically to their reply content in the context of the conversation."
+            )
+
+        messages_for_llm = self._build_chat_history_messages(
+            messages=[],
+            system_preamble=system_preamble,
+            extra_system_notes=extra_notes,
+        )
+
+        async for chunk in self._stream_ai_response(messages_for_llm):
+            yield chunk

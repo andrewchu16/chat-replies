@@ -41,3 +41,7 @@ app.include_router(messages_router, prefix="/chats", tags=["messages"])
 @app.get("/")
 async def root():
     return {"message": "chat-replies server is running", "version": "1.0.0"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}

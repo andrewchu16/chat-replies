@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 import json
 
@@ -49,50 +49,6 @@ async def send_message_stream(
             "Access-Control-Allow-Headers": "Cache-Control"
         }
     )
-
-
-@router.post("/{chat_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-async def send_message(
-    chat_id: str,
-    message_data: MessageCreate,
-    message_service: MessageService = Depends(get_message_service)
-) -> MessageResponse:
-    """
-    Send a new message to a chat.
-    
-    Args:
-        chat_id: Chat ID
-        message_data: Message creation data
-        message_service: Message service dependency
-        
-    Returns:
-        Created message data
-    """
-    message = await message_service.create_message(chat_id, message_data)
-    return MessageResponse.model_validate(message)
-
-
-@router.post("/{chat_id}/messages/{message_id}/reply", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-async def reply_to_message(
-    chat_id: str,
-    message_id: str,
-    reply_data: MessageReply,
-    message_service: MessageService = Depends(get_message_service)
-) -> MessageResponse:
-    """
-    Reply to a specific message with optional reply metadata.
-    
-    Args:
-        chat_id: Chat ID
-        message_id: Message ID to reply to
-        reply_data: Reply data
-        message_service: Message service dependency
-        
-    Returns:
-        Created reply message data
-    """
-    message = await message_service.reply_to_message(chat_id, message_id, reply_data)
-    return MessageResponse.model_validate(message)
 
 
 async def generate_reply_sse_stream(chat_id: str, message_id: str, reply_data: MessageReply, message_service: MessageService):
