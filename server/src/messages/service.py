@@ -4,6 +4,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, func
+from langchain_openai import ChatOpenAI
+from langchain_core.language_models import BaseChatModel
 
 from ..models import Message, MessageReplyMetadata, Chat, SenderType
 from ..exceptions import MessageNotFoundError, ChatNotFoundError, DatabaseError, InvalidReplyRangeError
@@ -15,6 +17,13 @@ class MessageService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._llm: None | BaseChatModel = None
+        
+    @property
+    def llm(self) -> BaseChatModel:
+        if self._llm is None:
+            self._llm = ChatOpenAI(model="openai:gpt-4o-mini")
+        return self._llm
     
     async def create_message(self, chat_id: str, message_data: MessageCreate) -> Message:
         """
@@ -280,6 +289,8 @@ class MessageService:
         """
         # Simulate AI processing time
         await asyncio.sleep(0.5)
+        
+        print(f"User content: {user_content[:50]}...")
         
         # Simple response generation (replace with actual AI service)
         responses = [
