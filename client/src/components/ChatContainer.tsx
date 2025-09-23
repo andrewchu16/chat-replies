@@ -5,13 +5,14 @@ import { ChatMessage } from "../models/chat";
 import { chatService } from "../services/chatService";
 import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
-import MessageInput from "./MessageInput";
+import MessageInput, { ReplyState } from "./MessageInput";
 
 export default function ChatContainer() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [replyState, setReplyState] = useState<ReplyState | null>(null);
 
 
   const handleSend = async (content: string) => {
@@ -60,6 +61,7 @@ export default function ChatContainer() {
     setIsLoading(true);
     setError(null);
     setStreamingMessageId(null);
+    setReplyState(null); // Clear reply state after sending
 
     try {
       await chatService.replyToMessageStream(
@@ -96,6 +98,18 @@ export default function ChatContainer() {
     }
   };
 
+  const handleStartReply = (messageId: string, messageContent: string, replyMetadata?: { startIndex: number; endIndex: number }) => {
+    setReplyState({
+      messageId,
+      messageContent,
+      replyMetadata
+    });
+  };
+
+  const handleCancelReply = () => {
+    setReplyState(null);
+  };
+
   // Load existing messages on component mount
   useEffect(() => {
     const loadMessages = async () => {
@@ -125,11 +139,14 @@ export default function ChatContainer() {
             messages={messages} 
             isLoading={isLoading} 
             streamingMessageId={streamingMessageId || undefined}
-            onReply={handleReply}
+            onReply={handleStartReply}
           />
           <MessageInput 
-            onSendMessage={handleSend} 
-            disabled={isLoading} 
+            onSendMessage={handleSend}
+            onReply={handleReply}
+            disabled={isLoading}
+            replyState={replyState}
+            onCancelReply={handleCancelReply}
           />
         </div>
       </main>

@@ -2,15 +2,28 @@
 
 import { useState, useRef, useEffect, FormEvent } from "react";
 import { ArrowUp } from "lucide-react";
+import ReplyPreview from "./ReplyPreview";
+
+export interface ReplyState {
+  messageId: string;
+  messageContent: string;
+  replyMetadata?: { startIndex: number; endIndex: number };
+}
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void;
+  onReply?: (messageId: string, content: string, replyMetadata?: { startIndex: number; endIndex: number }) => void;
   disabled?: boolean;
+  replyState?: ReplyState | null;
+  onCancelReply?: () => void;
 }
 
 export default function MessageInput({
   onSendMessage,
+  onReply,
   disabled = false,
+  replyState = null,
+  onCancelReply,
 }: MessageInputProps) {
   const [input, setInput] = useState("");
   const [rowCount, setRowCount] = useState(1);
@@ -21,7 +34,11 @@ export default function MessageInput({
     const trimmed = input.trim();
     if (!trimmed) return;
 
-    onSendMessage(trimmed);
+    if (replyState && onReply) {
+      onReply(replyState.messageId, trimmed, replyState.replyMetadata);
+    } else {
+      onSendMessage(trimmed);
+    }
     setInput("");
   };
 
@@ -30,7 +47,11 @@ export default function MessageInput({
       e.preventDefault();
       const trimmed = input.trim();
       if (trimmed) {
-        onSendMessage(trimmed);
+        if (replyState && onReply) {
+          onReply(replyState.messageId, trimmed, replyState.replyMetadata);
+        } else {
+          onSendMessage(trimmed);
+        }
         setInput("");
       }
     }
@@ -61,13 +82,19 @@ export default function MessageInput({
 
   return (
     <form onSubmit={handleSend} className="w-full">
+      {replyState && onCancelReply && (
+        <ReplyPreview 
+          messageContent={replyState.messageContent}
+          onCancel={onCancelReply}
+        />
+      )}
       <div className="relative rounded-2xl border border-black/10 bg-white focus-within:border-black/30 flex flex-col gap-2 px-2 py-2">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask, &quot;Give me a step-by-step guide to machine learning from scratch.&quot;"
+          placeholder={replyState ? "Type your reply..." : "Ask, \"Give me a step-by-step guide to machine learning from scratch.\""}
           className={`max-h-32 pt-2 px-2 outline-none bg-transparent placeholder-black/30 resize-none ${
             rowCount >= 3 ? "overflow-auto custom-scrollbar" : "overflow-hidden"
           }`}
