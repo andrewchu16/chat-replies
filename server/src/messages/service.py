@@ -8,6 +8,7 @@ from sqlalchemy import func as sa_func
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage as LCBaseMessage, HumanMessage as LCHumanMessage, AIMessage as LCAIMessage, SystemMessage as LCSystemMessage
+from langchain.chat_models import init_chat_model
 from ..models import Message, MessageReplyMetadata, Chat, SenderType
 from ..exceptions import MessageNotFoundError, ChatNotFoundError, DatabaseError, InvalidReplyRangeError
 from .schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate, StreamChunk
@@ -23,7 +24,7 @@ class MessageService:
     @property
     def llm(self) -> BaseChatModel:
         if self._llm is None:
-            self._llm = ChatOpenAI(model="openai:gpt-5-nano")
+            self._llm = init_chat_model(model="openai:gpt-5-nano")
         return self._llm
     
     async def create_message(self, chat_id: str, message_data: MessageCreate) -> Message:
