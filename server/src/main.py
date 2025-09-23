@@ -18,8 +18,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="LLM Chat API",
-    description="API for an LLM chat website",
+    title="Chat Replies Server",
+    description="Server for the chat-replies project",
     version="1.0.0",
     lifespan=lifespan,
     openapi_url="/openapi.json" if settings.debug else None
@@ -40,8 +40,4 @@ app.include_router(messages_router, prefix="/chats", tags=["messages"])
 
 @app.get("/")
 async def root():
-    return {"message": "LLM Chat API", "version": "1.0.0"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+    return {"message": "chat-replies server is running", "version": "1.0.0"}
