@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, List, Optional
+from typing import Generic, TypeVar
 from pydantic import BaseModel
 from sqlalchemy.orm import Query
 
@@ -11,7 +11,7 @@ class PaginationParams(BaseModel):
     size: int = 20
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "page": 1,
                 "size": 20
@@ -21,7 +21,7 @@ class PaginationParams(BaseModel):
 
 class PaginatedResponse(BaseModel, Generic[T]):
     """Generic paginated response model."""
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     size: int
@@ -30,7 +30,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     has_previous: bool
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "items": [],
                 "total": 0,

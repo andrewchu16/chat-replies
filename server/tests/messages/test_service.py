@@ -5,7 +5,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.messages.service import MessageService
-from src.messages.schemas import MessageCreate, MessageReply, MessageReplyMetadataCreate
+from src.messages.schemas import MessageCreate, MessageReplyCreate, MessageReplyCreate
 from src.chats.service import ChatService
 from src.chats.schemas import ChatCreate
 from src.exceptions import MessageNotFoundError, ChatNotFoundError, InvalidReplyRangeError
@@ -23,7 +23,7 @@ async def test_create_message(db: AsyncSession):
     message_service = MessageService(db)
     message_data = MessageCreate(content="Test message", sender=SenderType.USER)
     
-    message = await message_service.create_message(chat.id, message_data)
+    message = await message_service._create_message(chat.id, message_data)
     
     assert message.content == "Test message"
     assert message.sender == SenderType.USER
@@ -38,7 +38,7 @@ async def test_create_message_in_nonexistent_chat(db: AsyncSession):
     message_data = MessageCreate(content="Test message", sender=SenderType.USER)
     
     with pytest.raises(ChatNotFoundError):
-        await message_service.create_message("nonexistent-id", message_data)
+        await message_service._create_message("nonexistent-id", message_data)
 
 
 @pytest.mark.asyncio
@@ -49,19 +49,19 @@ async def test_reply_to_message(db: AsyncSession):
     chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
     
     message_service = MessageService(db)
-    original_message = await message_service.create_message(
+    original_message = await message_service._create_message(
         chat.id,
         MessageCreate(content="Original message", sender=SenderType.USER)
     )
     
     # Reply to the message
-    reply_data = MessageReply(
+    reply_data = MessageReplyCreate(
         content="Reply message",
         sender=SenderType.AI,
-        reply_metadata=MessageReplyMetadataCreate(start_index=0, end_index=8)
+        reply_metadata=MessageReplyCreate(start_index=0, end_index=8)
     )
     
-    reply = await message_service.reply_to_message(chat.id, original_message.id, reply_data)
+    reply = await message_service._create_message_reply(chat.id, original_message.id, reply_data)
     
     assert reply.content == "Reply message"
     assert reply.sender == SenderType.AI
@@ -83,20 +83,20 @@ async def test_reply_with_invalid_range(db: AsyncSession):
     chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
     
     message_service = MessageService(db)
-    original_message = await message_service.create_message(
+    original_message = await message_service._create_message(
         chat.id,
         MessageCreate(content="Short", sender=SenderType.USER)
     )
     
     # Reply with invalid range
-    reply_data = MessageReply(
+    reply_data = MessageReplyCreate(
         content="Reply message",
         sender=SenderType.AI,
-        reply_metadata=MessageReplyMetadataCreate(start_index=0, end_index=100)  # Beyond content length
+        reply_metadata=MessageReplyCreate(start_index=0, end_index=100)  # Beyond content length
     )
     
     with pytest.raises(InvalidReplyRangeError):
-        await message_service.reply_to_message(chat.id, original_message.id, reply_data)
+        await message_service._create_message_reply(chat.id, original_message.id, reply_data)
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_get_message(db: AsyncSession):
     chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
     
     message_service = MessageService(db)
-    created_message = await message_service.create_message(
+    created_message = await message_service._create_message(
         chat.id,
         MessageCreate(content="Test message", sender=SenderType.USER)
     )
@@ -142,7 +142,7 @@ async def test_get_chat_messages(db: AsyncSession):
     # Create multiple messages
     message_service = MessageService(db)
     for i in range(3):
-        await message_service.create_message(
+        await message_service._create_message(
             chat.id,
             MessageCreate(content=f"Message {i}", sender=SenderType.USER)
         )
@@ -161,7 +161,7 @@ async def test_count_chat_messages(db: AsyncSession):
     # Create multiple messages
     message_service = MessageService(db)
     for i in range(5):
-        await message_service.create_message(
+        await message_service._create_message(
             chat.id,
             MessageCreate(content=f"Message {i}", sender=SenderType.USER)
         )
