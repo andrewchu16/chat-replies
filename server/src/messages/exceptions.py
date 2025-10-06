@@ -40,3 +40,12 @@ class ReplyMetadataOutOfBoundsError(HTTPException):
             detail=f"Reply range ({start_index}-{end_index}) is out of bounds for content length {content_length}"
         )
 
+
+class InvalidReplyRangeError(HTTPException):
+    """Exception raised when reply range is invalid."""
+    
+    def __init__(self, start_index: int, end_index: int):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid reply range: {start_index}-{end_index}"
+        )

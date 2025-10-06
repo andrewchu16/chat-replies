@@ -1,8 +1,2 @@
 # Include base requirements
 -r base.txt
-
-# Monitoring and logging
-structlog==23.2.0
-
-# Production security
-cryptography==41.0.7

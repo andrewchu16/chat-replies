@@ -15,7 +15,7 @@ This project includes Docker configuration for both development and production e
 
 3. Build and start all services:
    ```bash
-   docker compose -f compose.prod.yaml up --build
+   docker compose -f compose.prod.yaml up --build -d postgres server client
    ```
 
 ### Development Environment
@@ -27,7 +27,19 @@ This project includes Docker configuration for both development and production e
 
 2. Start the development environment:
    ```bash
-   docker compose -f compose.dev.yaml up --build -w
+   docker compose -f compose.dev.yaml up --build -w postgres server client
+   ```
+
+### Tests
+
+1. Copy the environment file:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+2. Start the testing environment:
+   ```bash
+   docker compose -f compose.dev.yaml up --build postgres server-test
    ```
 
 ## Database Management

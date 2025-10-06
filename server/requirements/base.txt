@@ -24,3 +24,9 @@ python-dateutil==2.8.2
 # Langchain
 langchain
 langchain-openai
+
+# Production security
+cryptography==41.0.7
+
+# Monitoring and logging
+structlog==23.2.0
