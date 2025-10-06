@@ -1,5 +1,5 @@
 """Pytest configuration and fixtures."""
-
+import os
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -7,11 +7,15 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# Set test database URL before importing main app
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///db/memory.db"
+
 from src.main import app
 from src.database import get_db, Base
+import src.database
 
-# Use in-memory SQLite for testing with asyncpg-like syntax
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Use file-based SQLite for testing
+SQLALCHEMY_DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -36,6 +40,10 @@ async def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
+
+# Override database configuration for testing
+src.database.engine = engine
+src.database.async_session = TestingSessionLocal
 
 
 @pytest_asyncio.fixture

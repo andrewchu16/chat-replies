@@ -39,7 +39,7 @@ This project includes Docker configuration for both development and production e
 
 2. Start the testing environment:
    ```bash
-   docker compose -f compose.dev.yaml up --build postgres server-test
+   docker compose -f compose.dev.yaml up --build -w server-test
    ```
 
 ## Database Management

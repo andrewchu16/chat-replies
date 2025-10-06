@@ -73,10 +73,25 @@ services:
       context: ./server
       dockerfile: Dockerfile.test
     container_name: chat-replies-server-test
+    volumes:
+      - sqlite_test_data:/app/db/memory.db
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///db/memory.db
+      - ENVIRONMENT=test
     command: ["python", "-m", "pytest", "tests/", "-v"]
+    develop:
+      watch:
+        - action: sync
+          path: ./server/src
+          target: /app/src
+        - action: sync
+          path: ./server/tests
+          target: /app/tests
 
 volumes:
   postgres_dev_data:
+    driver: local
+  sqlite_test_data:
     driver: local
 
 networks:
