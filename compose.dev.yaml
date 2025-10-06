@@ -67,6 +67,13 @@ services:
         - action: sync
           path: ./client
           target: /app
+  
+  server-test:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.test
+    container_name: chat-replies-server-test
+    command: ["python", "-m", "pytest", "tests/", "-v"]
 
 volumes:
   postgres_dev_data:

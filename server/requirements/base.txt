@@ -5,6 +5,7 @@ uvicorn[standard]==0.24.0
 # Database
 sqlalchemy==2.0.23
 alembic==1.12.1
+asyncpg==0.30.0
 
 # Pydantic and settings
 pydantic==2.11.0

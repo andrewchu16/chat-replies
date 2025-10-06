@@ -1,11 +1,6 @@
 # Include base requirements
 -r base.txt
 
-# Production server (using uvicorn from base.txt)
-
-# Production database drivers
-asyncpg==0.30.0
-
 # Monitoring and logging
 structlog==23.2.0
 
