@@ -160,6 +160,7 @@ export class ChatService {
       reply_metadata: replyMetadata ? {
         start_index: replyMetadata.startIndex,
         end_index: replyMetadata.endIndex,
+        parent_id: messageId,
       } : undefined,
     };
 
@@ -169,7 +170,7 @@ export class ChatService {
       // Add the reply message to our local messages
       const replyMessage: ChatMessage = {
         id: apiMessage.id,
-        sender: apiMessage.sender as "user" | "assistant",
+        sender: apiMessage.sender,
         content: apiMessage.content,
         timestamp: new Date(apiMessage.created_at),
       };
@@ -198,6 +199,7 @@ export class ChatService {
       reply_metadata: replyMetadata ? {
         start_index: replyMetadata.startIndex,
         end_index: replyMetadata.endIndex,
+        parent_id: messageId,
       } : undefined,
     };
 

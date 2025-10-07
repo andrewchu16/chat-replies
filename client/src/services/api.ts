@@ -29,22 +29,24 @@ class ApiService {
   }
 
   async sendMessage(chatId: string, content: string): Promise<ApiMessage> {
-    const response = await fetch(`${this.baseUrl}/chats/${chatId}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    // Fallback non-stream helper built on top of streaming endpoint
+    const messageId = await new Promise<string>((resolve, reject) => {
+      this.sendMessageStream(
+        chatId,
         content,
-        sender: "user",
-      }),
+        () => {},
+        (finalMessageId) => resolve(finalMessageId),
+        (error) => reject(new Error(error))
+      ).catch(reject);
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to send message: ${response.statusText}`);
+    const finalResponse = await fetch(
+      `${this.baseUrl}/chats/${chatId}/messages/${messageId}`
+    );
+    if (!finalResponse.ok) {
+      throw new Error(`Failed to fetch created message: ${finalResponse.statusText}`);
     }
-
-    return response.json();
+    return finalResponse.json();
   }
 
   async sendMessageStream(
@@ -147,22 +149,25 @@ class ApiService {
     messageId: string,
     replyData: MessageReply
   ): Promise<ApiMessage> {
-    const response = await fetch(
-      `${this.baseUrl}/chats/${chatId}/messages/${messageId}/reply`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(replyData),
-      }
+    // Fallback non-stream helper built on top of streaming endpoint
+    const aiMessageId = await new Promise<string>((resolve, reject) => {
+      this.replyToMessageStream(
+        chatId,
+        messageId,
+        replyData,
+        () => {},
+        (finalMessageId) => resolve(finalMessageId),
+        (error) => reject(new Error(error))
+      ).catch(reject);
+    });
+
+    const finalResponse = await fetch(
+      `${this.baseUrl}/chats/${chatId}/messages/${aiMessageId}`
     );
-
-    if (!response.ok) {
-      throw new Error(`Failed to reply to message: ${response.statusText}`);
+    if (!finalResponse.ok) {
+      throw new Error(`Failed to fetch created reply: ${finalResponse.statusText}`);
     }
-
-    return response.json();
+    return finalResponse.json();
   }
 
   async replyToMessageStream(

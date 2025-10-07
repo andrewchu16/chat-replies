@@ -1,19 +1,27 @@
 import { ChatMessageSender } from "./common";
 
+export interface MessageReplyMetadataResponse {
+  id: string;
+  message_id: string;
+  start_index: number;
+  end_index: number;
+  created_at: string;
+}
+
 export interface ApiMessage {
   id: string;
   chat_id: string;
   content: string;
   sender: ChatMessageSender;
   created_at: string;
-  reply_metadata: any[];
+  reply_metadata: MessageReplyMetadataResponse | null;
 }
 
 export interface ApiChat {
   id: string;
-  title?: string;
+  title: string;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 export interface StreamChunk {
@@ -25,6 +33,7 @@ export interface StreamChunk {
 export interface MessageReplyMetadata {
   start_index: number;
   end_index: number;
+  parent_id: string;
 }
 
 export interface MessageReply {

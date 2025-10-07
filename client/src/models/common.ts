@@ -1,1 +1,1 @@
-export type ChatMessageSender = "user" | "assistant";
+export type ChatMessageSender = "user" | "ai";
