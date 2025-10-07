@@ -26,9 +26,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY src/ ./src/
 
-# Create non-root user
+# Create non-root user and db directory
 RUN adduser --disabled-password --gecos '' appuser \
-    && chown -R appuser:appuser /app
+    && mkdir -p /app/db \
+    && chown -R appuser:appuser /app \
+    && chmod 755 /app/db
 USER appuser
 
 # Health check

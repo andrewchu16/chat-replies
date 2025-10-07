@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.pool import StaticPool
 
 # Set test database URL before importing main app
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///db/memory.db"
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 from src.main import app
 from src.database import get_db, Base

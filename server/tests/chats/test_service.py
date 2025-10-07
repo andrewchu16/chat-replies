@@ -33,6 +33,7 @@ async def test_get_chat(db: AsyncSession):
     
     assert retrieved_chat.id == created_chat.id
     assert retrieved_chat.title == created_chat.title
+    assert retrieved_chat.created_at == created_chat.created_at
 
 
 @pytest.mark.asyncio
@@ -78,5 +79,10 @@ async def test_list_chats(db: AsyncSession):
         chat_data = ChatCreate(title=f"Chat {i}")
         await service.create_chat(chat_data)
     
-    chats = await service.list_chats()
+    chats, total = await service.list_chats()
+    print(chats)
     assert len(chats) == 3
+    assert total == 3
+    assert chats[0].title == "Chat 2"
+    assert chats[1].title == "Chat 1"
+    assert chats[2].title == "Chat 0"

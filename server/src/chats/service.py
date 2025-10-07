@@ -109,11 +109,11 @@ class ChatService:
         List chats with pagination.
         
         Args:
-            skip: Number of chats to skip
+            skip: Number of chats to skip (ordered by created_at in descending order)
             limit: Maximum number of chats to return
             
         Returns:
-            tuple of (list of chat objects, total count)
+            tuple of (list of chat objects, total count of chats)
         """
         # Get total count
         count_result = await self.db.execute(select(func.count(Chat.id)))
