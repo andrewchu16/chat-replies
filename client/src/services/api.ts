@@ -1,4 +1,3 @@
-import { ChatMessage } from "../models/chat";
 import { ApiChat, ApiMessage, StreamChunk, MessageReply } from "../models/api";
 
 export type { ApiChat, ApiMessage, StreamChunk, MessageReply };

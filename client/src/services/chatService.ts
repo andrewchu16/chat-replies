@@ -41,7 +41,7 @@ export class ChatService {
       // In a real implementation, you'd get this from the API response
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        sender: "assistant",
+        sender: "ai",
         content: `I received your message: "${content}". This is a placeholder response. The actual AI response would come from the backend API.`,
         timestamp: new Date(),
       };
@@ -79,7 +79,7 @@ export class ChatService {
     // Create AI message placeholder
     const aiMessage: ChatMessage = {
       id: crypto.randomUUID(),
-      sender: "assistant",
+      sender: "ai",
       content: "",
       timestamp: new Date(),
     };
@@ -216,7 +216,7 @@ export class ChatService {
     // Create AI response placeholder
     const aiMessage: ChatMessage = {
       id: crypto.randomUUID(),
-      sender: "assistant",
+      sender: "ai",
       content: "",
       timestamp: new Date(),
     };

@@ -39,7 +39,7 @@ class MessageService:
     @property
     def llm(self) -> BaseChatModel:
         if self._llm is None:
-            self._llm = init_chat_model(model="openai:gpt-5-nano")
+            self._llm = init_chat_model(model="openai:gpt-5-mini")
         return self._llm
 
     async def _get_chat(self, chat_id: str) -> Chat:

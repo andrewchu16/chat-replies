@@ -30,7 +30,7 @@ export default function ChatContainer() {
           
           // Find the AI message that's being streamed
           const aiMessage = currentMessages.find(msg => 
-            msg.sender === "assistant" && msg.content && !msg.content.trim().endsWith(".")
+            msg.sender === "ai" && msg.content && !msg.content.trim().endsWith(".")
           );
           if (aiMessage && !streamingMessageId) {
             setStreamingMessageId(aiMessage.id);
@@ -75,7 +75,7 @@ export default function ChatContainer() {
           
           // Find the AI message that's being streamed
           const aiMessage = currentMessages.find(msg => 
-            msg.sender === "assistant" && msg.content && !msg.content.trim().endsWith(".")
+            msg.sender === "ai" && msg.content && !msg.content.trim().endsWith(".")
           );
           if (aiMessage && !streamingMessageId) {
             setStreamingMessageId(aiMessage.id);
@@ -127,7 +127,7 @@ export default function ChatContainer() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      <main className="mx-auto max-w-xl px-4 sm:px-6 md:px-8 py-12">
+      <main className="mx-auto max-w-3xl px-4 sm:px-6 md:px-8 py-12">
         <div className="flex flex-col items-center">
           <ChatHeader />
           {error && (

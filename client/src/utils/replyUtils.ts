@@ -40,19 +40,6 @@ export function getTextSelection(element: HTMLElement): TextSelection | null {
 }
 
 /**
- * Create a reply message with metadata for text selection
- */
-export function createReplyWithSelection(
-  content: string,
-  selectedText: string,
-  startIndex: number,
-  endIndex: number
-): string {
-  // You can customize this format based on your needs
-  return `${content}\n\n> "${selectedText}"`;
-}
-
-/**
  * Validate reply metadata
  */
 export function validateReplyMetadata(
