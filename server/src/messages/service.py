@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy import func as sa_func
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
@@ -23,9 +24,7 @@ from .schemas import (
     MessageContextRepresentation,
     MessageCreate,
     MessageReplyCreate,
-    MessageReplyMetadataCreate,
     MessageResponse,
-    MessagesListResponse,
     StreamChunk,
 )
 
@@ -171,7 +170,7 @@ class MessageService:
 
     async def get_chat_messages(
         self, chat_id: str, skip: int = 0, limit: int = 100, reverse: bool = False
-    ) -> MessagesListResponse:
+    ) -> list[MessageResponse]:
         """
         Get all messages in a chat with pagination.
 
@@ -195,17 +194,41 @@ class MessageService:
             .order_by(
                 Message.created_at.desc() if reverse else Message.created_at.asc()
             )
-            .join(MessageReplyMetadata, MessageReplyMetadata.message_id == Message.id)
+            .options(selectinload(Message.reply_metadata))
             .offset(skip)
             .limit(limit)
         )
 
-        return MessagesListResponse(
-            messages=[
-                {**message.__dict__, "reply_metadata": message.reply_metadata.__dict__}
-                for message in result.scalars().all()
-            ]
-        )
+        messages = result.scalars().all()
+
+        # Include optional reply metadata when present; otherwise set to None
+        response_items: list[dict] = []
+        for m in messages:
+            reply_md = None
+            if getattr(m, "reply_metadata", None):
+                # relationship is a list; take the first entry if exists
+                md = m.reply_metadata[0] if isinstance(m.reply_metadata, list) and m.reply_metadata else None
+                if md is not None:
+                    reply_md = {
+                        "id": md.id,
+                        "message_id": md.message_id,
+                        "start_index": md.start_index,
+                        "end_index": md.end_index,
+                        "created_at": md.created_at,
+                    }
+
+            response_items.append(
+                {
+                    "id": m.id,
+                    "chat_id": m.chat_id,
+                    "content": m.content,
+                    "sender": m.sender,
+                    "created_at": m.created_at,
+                    "reply_metadata": reply_md,
+                }
+            )
+
+        return response_items
 
     async def count_chat_messages(self, chat_id: str) -> int:
         """

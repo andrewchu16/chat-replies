@@ -5,10 +5,11 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.messages.service import MessageService
-from src.messages.schemas import MessageCreate, MessageReplyCreate, MessageReplyCreate
+from src.messages.schemas import MessageCreate, MessageReplyCreate, MessageReplyMetadataCreate
 from src.chats.service import ChatService
 from src.chats.schemas import ChatCreate
-from src.exceptions import MessageNotFoundError, ChatNotFoundError, InvalidReplyRangeError
+from src.exceptions import MessageNotFoundError, ChatNotFoundError
+from src.messages.exceptions import InvalidReplyRangeError
 from src.models import SenderType
 
 
@@ -58,7 +59,7 @@ async def test_reply_to_message(db: AsyncSession):
     reply_data = MessageReplyCreate(
         content="Reply message",
         sender=SenderType.AI,
-        reply_metadata=MessageReplyCreate(start_index=0, end_index=8)
+        reply_metadata=MessageReplyMetadataCreate(start_index=0, end_index=8, parent_id=original_message.id)
     )
     
     reply = await message_service._create_message_reply(chat.id, original_message.id, reply_data)
@@ -92,7 +93,7 @@ async def test_reply_with_invalid_range(db: AsyncSession):
     reply_data = MessageReplyCreate(
         content="Reply message",
         sender=SenderType.AI,
-        reply_metadata=MessageReplyCreate(start_index=0, end_index=100)  # Beyond content length
+        reply_metadata=MessageReplyMetadataCreate(start_index=0, end_index=100, parent_id=original_message.id)  # Beyond content length
     )
     
     with pytest.raises(InvalidReplyRangeError):

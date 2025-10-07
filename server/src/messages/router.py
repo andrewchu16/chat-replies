@@ -129,7 +129,7 @@ async def get_chat_messages(
     """
     messages = await message_service.get_chat_messages(chat_id, skip, limit)
 
-    return messages
+    return MessagesListResponse(messages=messages)
 
 
 @router.get("/{chat_id}/messages/{message_id}", response_model=MessageResponse)

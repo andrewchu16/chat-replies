@@ -21,16 +21,6 @@ class MessageNotFoundError(HTTPException):
         )
 
 
-class InvalidReplyRangeError(HTTPException):
-    """Exception raised when reply range is invalid."""
-    
-    def __init__(self, start_index: int, end_index: int):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid reply range: start_index ({start_index}) must be less than end_index ({end_index})"
-        )
-
-
 class DatabaseError(HTTPException):
     """Exception raised for database-related errors."""
     
