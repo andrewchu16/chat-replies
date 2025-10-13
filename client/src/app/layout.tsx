@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Chat Replies",
-  description: "Why can't we reply to AI messages?",
+  description: "Why can't we reply to LLM messages?",
 };
 
 export default function RootLayout({

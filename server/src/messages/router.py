@@ -14,6 +14,8 @@ async def generate_sse_stream(
 ):
     """Generate SSE stream for message responses."""
     try:
+        # Send a prelude comment to flush headers and start the stream immediately
+        yield ":ok\n\n"
         async for chunk in message_service.create_message_with_streaming_response(
             chat_id, message_data
         ):
@@ -45,12 +47,14 @@ async def send_message_stream(
     """
     return StreamingResponse(
         generate_sse_stream(chat_id, message_data, message_service),
-        media_type="text/event-stream",
+        media_type="text/event-stream; charset=utf-8",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
+            # Disable proxy buffering (e.g., nginx) to allow immediate flushing
+            "X-Accel-Buffering": "no",
         },
     )
 
@@ -63,6 +67,8 @@ async def generate_reply_sse_stream(
 ):
     """Generate SSE stream for reply responses."""
     try:
+        # Send a prelude comment to flush headers and start the stream immediately
+        yield ":ok\n\n"
         async for chunk in message_service.reply_to_message_with_streaming_response(
             chat_id, message_id, reply_data
         ):
@@ -96,12 +102,13 @@ async def reply_to_message_stream(
     """
     return StreamingResponse(
         generate_reply_sse_stream(chat_id, message_id, reply_data, message_service),
-        media_type="text/event-stream",
+        media_type="text/event-stream; charset=utf-8",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
+            "X-Accel-Buffering": "no",
         },
     )
 

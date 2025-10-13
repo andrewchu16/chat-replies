@@ -15,43 +15,6 @@ export class ChatService {
     }
   }
 
-  async sendMessage(content: string): Promise<void> {
-    if (!this.chatId) {
-      await this.initializeChat();
-    }
-
-    if (!this.chatId) {
-      throw new Error("Failed to create chat");
-    }
-
-    // Add user message immediately
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      sender: "user",
-      content,
-      timestamp: new Date(),
-    };
-    this.messages.push(userMessage);
-
-    // Send to API and get AI response
-    try {
-      await apiService.sendMessage(this.chatId, content);
-      
-      // For now, add a placeholder AI response
-      // In a real implementation, you'd get this from the API response
-      const aiMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        sender: "ai",
-        content: `I received your message: "${content}". This is a placeholder response. The actual AI response would come from the backend API.`,
-        timestamp: new Date(),
-      };
-      this.messages.push(aiMessage);
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      throw error;
-    }
-  }
-
   async sendMessageStream(
     content: string,
     onUpdate: () => void,
@@ -93,7 +56,7 @@ export class ChatService {
         (chunk) => {
           // Add chunk content to AI message
           if (chunk.content) {
-            aiMessage.content += chunk.content + " ";
+            aiMessage.content += chunk.content;
             onUpdate(); // Notify UI of content update
           }
         },

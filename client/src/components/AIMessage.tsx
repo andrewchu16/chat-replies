@@ -13,20 +13,6 @@ interface AIMessageProps {
 }
 
 export default function AIMessage({ message, isStreaming = false, isLoading = false, onReply }: AIMessageProps) {
-  useEffect(() => {
-    // Log the raw message as received by the component for debugging markdown issues
-    // Includes a short preview and full content
-    console.log("[AIMessage] received", {
-      id: message.id,
-      sender: message.sender,
-      isStreaming,
-      isLoading,
-      contentLength: message.content?.length ?? 0,
-      contentPreview: message.content?.slice(0, 200),
-      content: message.content,
-    });
-  }, [message.id, message.sender, message.content, isStreaming, isLoading]);
-
   return (
     <div className="w-full p-2">
       <div className="flex flex-col">
@@ -59,13 +45,13 @@ export default function AIMessage({ message, isStreaming = false, isLoading = fa
           )}
         </div>
         
-        {onReply && (
-          <div className="mt-2">
+        {onReply && !isStreaming && (
+          <div className="mt-1">
             <ReplyButton
               messageId={message.id}
               messageContent={message.content}
               onReply={onReply}
-              disabled={isLoading}
+              disabled={false}
             />
           </div>
         )}

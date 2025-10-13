@@ -35,6 +35,8 @@ class MessageService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self._llm: None | BaseChatModel = None
+        self.system_prompt_send = """You are an AI chat assistant. You will be given the past few messages of the conversation. Use the conversation history to respond helpfully and concisely. Format responses with markdown, including headers, lists, and other formatting."""
+        self.system_prompt_reply = """You are an AI chat assistant. You will be given a chain of replies that the user has made. Use the conversation history to respond helpfully and concisely. Format responses with markdown, including headers, lists, and other formatting."""
 
     @property
     def llm(self) -> BaseChatModel:
@@ -207,7 +209,11 @@ class MessageService:
             reply_md = None
             if getattr(m, "reply_metadata", None):
                 # relationship is a list; take the first entry if exists
-                md = m.reply_metadata[0] if isinstance(m.reply_metadata, list) and m.reply_metadata else None
+                md = (
+                    m.reply_metadata[0]
+                    if isinstance(m.reply_metadata, list) and m.reply_metadata
+                    else None
+                )
                 if md is not None:
                     reply_md = {
                         "id": md.id,
@@ -267,7 +273,10 @@ class MessageService:
 
         # Build chat history context using the last 10 messages (including the new one)
         recent_messages = await self._get_last_chat_messages(chat_id, limit=10)
-        messages_for_llm = self._build_chat_history_messages(recent_messages)
+        messages_for_llm = self._build_chat_history_messages(
+            recent_messages, system_prompt=self.system_prompt_send
+        )
+        
 
         # Stream the AI response directly from the LLM
         message_id = str(uuid.uuid4())
@@ -324,7 +333,7 @@ class MessageService:
         result = await self.db.execute(
             select(Message)
             .where(Message.chat_id == chat_id)
-            .order_by(Message.created_at.desc())
+            .order_by(Message.created_at.asc())
             .limit(limit)
         )
         messages_desc = result.scalars().all()
@@ -342,7 +351,7 @@ class MessageService:
         self,
         messages: list[MessageContextRepresentation],
         *,
-        system_preamble: Optional[str] = None,
+        system_prompt: Optional[str] = None,
         extra_system_notes: Optional[str] = None,
     ) -> list[LCBaseMessage]:
         """
@@ -350,10 +359,10 @@ class MessageService:
         Optionally prepend a SystemMessage with guidance and notes.
         """
         chat_messages: list[LCBaseMessage] = []
-        if system_preamble or extra_system_notes:
+        if system_prompt or extra_system_notes:
             parts: list[str] = []
-            if system_preamble:
-                parts.append(system_preamble)
+            if system_prompt:
+                parts.append(system_prompt)
             if extra_system_notes:
                 parts.append(extra_system_notes)
             chat_messages.append(LCSystemMessage(content="\n\n".join(parts)))
@@ -478,7 +487,6 @@ class MessageService:
         original_message = await self.get_message(chat_id, message_id)
 
         message_chain = await self._get_reply_chain(chat_id, message_id, min_length=10)
-        print(message_chain)
 
         referenced_text = message_chain[-1].content
 
@@ -498,7 +506,7 @@ class MessageService:
             )
         )
 
-        print(message_chain)
+        print(f"Message chain: {message_chain}")
 
         extra_notes = (
             f"The user replied specifically to this text: '{referenced_text}'. "
@@ -506,9 +514,7 @@ class MessageService:
         )
         messages_for_llm = self._build_chat_history_messages(
             message_chain,
-            system_preamble=(
-                "You are an AI chat assistant. You will be given a chain of replies that the user has made. Use the conversation history to respond helpfully and concisely."
-            ),
+            system_prompt=self.system_prompt_reply,
             extra_system_notes=extra_notes,
         )
 

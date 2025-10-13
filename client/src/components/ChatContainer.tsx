@@ -11,9 +11,10 @@ export default function ChatContainer() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
+    null
+  );
   const [replyState, setReplyState] = useState<ReplyState | null>(null);
-
 
   const handleSend = async (content: string) => {
     setIsLoading(true);
@@ -27,10 +28,13 @@ export default function ChatContainer() {
           // Update messages with streaming content
           const currentMessages = chatService.getMessages();
           setMessages(currentMessages);
-          
+
           // Find the AI message that's being streamed
-          const aiMessage = currentMessages.find(msg => 
-            msg.sender === "ai" && msg.content && !msg.content.trim().endsWith(".")
+          const aiMessage = currentMessages.find(
+            (msg) =>
+              msg.sender === "ai" &&
+              msg.content &&
+              !msg.content.trim().endsWith(".")
           );
           if (aiMessage && !streamingMessageId) {
             setStreamingMessageId(aiMessage.id);
@@ -54,8 +58,8 @@ export default function ChatContainer() {
   };
 
   const handleReply = async (
-    messageId: string, 
-    content: string, 
+    messageId: string,
+    content: string,
     replyMetadata?: { startIndex: number; endIndex: number }
   ) => {
     setIsLoading(true);
@@ -72,10 +76,13 @@ export default function ChatContainer() {
           // Update messages with streaming content
           const currentMessages = chatService.getMessages();
           setMessages(currentMessages);
-          
+
           // Find the AI message that's being streamed
-          const aiMessage = currentMessages.find(msg => 
-            msg.sender === "ai" && msg.content && !msg.content.trim().endsWith(".")
+          const aiMessage = currentMessages.find(
+            (msg) =>
+              msg.sender === "ai" &&
+              msg.content &&
+              !msg.content.trim().endsWith(".")
           );
           if (aiMessage && !streamingMessageId) {
             setStreamingMessageId(aiMessage.id);
@@ -98,11 +105,15 @@ export default function ChatContainer() {
     }
   };
 
-  const handleStartReply = (messageId: string, messageContent: string, replyMetadata?: { startIndex: number; endIndex: number }) => {
+  const handleStartReply = (
+    messageId: string,
+    messageContent: string,
+    replyMetadata?: { startIndex: number; endIndex: number }
+  ) => {
     setReplyState({
       messageId,
       messageContent,
-      replyMetadata
+      replyMetadata,
     });
   };
 
@@ -126,30 +137,26 @@ export default function ChatContainer() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <main className="mx-auto max-w-3xl px-4 sm:px-6 md:px-8 py-12">
-        <div className="flex flex-col items-center">
-          <ChatHeader />
-          {error && (
-            <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          <MessageList 
-            messages={messages} 
-            isLoading={isLoading} 
-            streamingMessageId={streamingMessageId || undefined}
-            onReply={handleStartReply}
-          />
-          <MessageInput 
-            onSendMessage={handleSend}
-            onReply={handleReply}
-            disabled={isLoading}
-            replyState={replyState}
-            onCancelReply={handleCancelReply}
-          />
+    <div className="flex flex-col items-center">
+      <ChatHeader />
+      {error && (
+        <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
         </div>
-      </main>
+      )}
+      <MessageList
+        messages={messages}
+        isLoading={isLoading}
+        streamingMessageId={streamingMessageId || undefined}
+        onReply={handleStartReply}
+      />
+      <MessageInput
+        onSendMessage={handleSend}
+        onReply={handleReply}
+        disabled={isLoading}
+        replyState={replyState}
+        onCancelReply={handleCancelReply}
+      />
     </div>
   );
 }
