@@ -13,8 +13,8 @@ interface MessageListProps {
 
 export default function MessageList({ messages, isLoading = false, streamingMessageId, onReply }: MessageListProps) {
   return (
-    <div className="w-full border border-black/10 rounded-2xl p-4 mb-4 overflow-y-auto">
-      <div className="min-h-[40vh] max-h-[60vh] space-y-3">
+    <div className="w-full border border-black/10 rounded-2xl p-4 mb-4 overflow-y-auto flex-1 min-h-0">
+      <div className="space-y-3">
         {messages.length === 0 ? (
           <p className="text-black/40 text-sm text-center mt-8">
             Your conversation will appear here.

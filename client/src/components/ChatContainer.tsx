@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { ChatMessage } from "../models/chat";
 import { chatService } from "../services/chatService";
-import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
 import MessageInput, { ReplyState } from "./MessageInput";
 
@@ -137,8 +136,7 @@ export default function ChatContainer() {
   }, []);
 
   return (
-    <div className="flex flex-col items-center">
-      <ChatHeader />
+    <div className="flex flex-col items-center w-full h-full min-h-0">
       {error && (
         <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
