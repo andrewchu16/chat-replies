@@ -1,7 +1,7 @@
 """Tests for messages service."""
 
+import asyncio
 import pytest
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.messages.service import MessageService
@@ -169,3 +169,233 @@ async def test_count_chat_messages(db: AsyncSession):
     
     count = await message_service.count_chat_messages(chat.id)
     assert count == 5
+
+
+@pytest.mark.asyncio
+async def test_get_chat_messages_ascending_order(db: AsyncSession):
+    """Test that messages are retrieved in ascending chronological order (oldest first)."""
+    # Create a chat
+    chat_service = ChatService(db)
+    chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
+    
+    # Create multiple messages with different senders
+    message_service = MessageService(db)
+    messages = []
+    for i in range(5):
+        sender = SenderType.USER if i % 2 == 0 else SenderType.AI
+        message = await message_service._create_message(
+            chat.id,
+            MessageCreate(content=f"Message {i}", sender=sender)
+        )
+        messages.append(message)
+    
+    # Get messages in ascending order (default)
+    retrieved_messages = await message_service.get_chat_messages(chat.id, reverse=False)
+    
+    # Verify we got all messages
+    assert len(retrieved_messages) == 5
+    
+    # Verify messages are in ascending chronological order (oldest first)
+    for i in range(len(retrieved_messages) - 1):
+        current_created_at = retrieved_messages[i].created_at
+        next_created_at = retrieved_messages[i + 1].created_at
+        assert current_created_at <= next_created_at, f"Message {i} should be older than message {i+1}"
+    
+    # Verify content matches expected order
+    for i, message in enumerate(retrieved_messages):
+        assert message.content == f"Message {i}"
+
+
+@pytest.mark.asyncio
+async def test_get_chat_messages_descending_order(db: AsyncSession):
+    """Test that messages are retrieved in descending chronological order (newest first)."""
+    # Create a chat
+    chat_service = ChatService(db)
+    chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
+    
+    # Create multiple messages
+    message_service = MessageService(db)
+    messages = []
+    for i in range(5):
+        message = await message_service._create_message(
+            chat.id,
+            MessageCreate(content=f"Message {i}", sender=SenderType.USER)
+        )
+        messages.append(message)
+    
+    # Get messages in descending order
+    retrieved_messages = await message_service.get_chat_messages(chat.id, reverse=True)
+    
+    # Verify we got all messages
+    assert len(retrieved_messages) == 5
+    
+    # Verify messages are in descending chronological order (newest first)
+    for i in range(len(retrieved_messages) - 1):
+        current_created_at = retrieved_messages[i].created_at
+        next_created_at = retrieved_messages[i + 1].created_at
+        assert current_created_at > next_created_at, f"Message {i} should be newer than message {i+1}"
+    
+    # Verify content matches expected reverse order
+    for i, message in enumerate(retrieved_messages):
+        expected_content = f"Message {4 - i}"  # Reverse order: 4, 3, 2, 1, 0
+        assert message.content == expected_content
+
+
+@pytest.mark.asyncio
+async def test_get_chat_messages_order_with_replies(db: AsyncSession):
+    """Test message ordering when messages have replies."""
+    # Create a chat
+    chat_service = ChatService(db)
+    chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
+    
+    message_service = MessageService(db)
+    
+    # Create first message
+    message1 = await message_service._create_message(
+        chat.id,
+        MessageCreate(content="First message", sender=SenderType.USER)
+    )
+    
+    message2 = await message_service._create_message(
+        chat.id,
+        MessageCreate(content="Second message", sender=SenderType.AI)
+    )
+    
+    # Create a reply to the original message
+    reply_data = MessageReplyCreate(
+        content="Reply message",
+        sender=SenderType.USER,
+        reply_metadata=MessageReplyMetadataCreate(start_index=0, end_index=8, parent_id=message2.id)
+    )
+    await message_service._create_message_reply(chat.id, message2.id, reply_data)
+    
+    # Create another message after the reply
+    await message_service._create_message(
+        chat.id,
+        MessageCreate(content="Final message", sender=SenderType.USER)
+    )
+    
+    # Get messages in ascending order
+    retrieved_messages = await message_service.get_chat_messages(chat.id, reverse=False)
+    
+    # Verify we got all 3 messages
+    assert len(retrieved_messages) == 4
+    
+    # Verify chronological order: first -> second -> reply -> final
+    assert retrieved_messages[0].content == "First message"
+    assert retrieved_messages[1].content == "Second message"
+    assert retrieved_messages[2].content == "Reply message"
+    assert retrieved_messages[3].content == "Final message"
+    
+    # Verify timestamps are in ascending order
+    for i in range(len(retrieved_messages) - 1):
+        current_created_at = retrieved_messages[i].created_at
+        next_created_at = retrieved_messages[i + 1].created_at
+        assert current_created_at <= next_created_at
+
+
+@pytest.mark.asyncio
+async def test_get_chat_messages_order_with_pagination(db: AsyncSession):
+    """Test message ordering with pagination."""
+    # Create a chat
+    chat_service = ChatService(db)
+    chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
+    
+    # Create 10 messages
+    message_service = MessageService(db)
+    for i in range(10):
+        await message_service._create_message(
+            chat.id,
+            MessageCreate(content=f"Message {i:02d}", sender=SenderType.USER)
+        )
+    
+    # Test pagination with ascending order
+    page1 = await message_service.get_chat_messages(chat.id, skip=0, limit=5, reverse=False)
+    page2 = await message_service.get_chat_messages(chat.id, skip=5, limit=5, reverse=False)
+    
+    # Verify page 1 contains messages 0-4 in order
+    assert len(page1) == 5
+    for i, message in enumerate(page1):
+        assert message.content == f"Message {i:02d}"
+    
+    # Verify page 2 contains messages 5-9 in order
+    assert len(page2) == 5
+    for i, message in enumerate(page2):
+        assert message.content == f"Message {i+5:02d}"
+    
+    # Verify timestamps are in ascending order within each page
+    for page in [page1, page2]:
+        for i in range(len(page) - 1):
+            assert page[i].created_at <= page[i + 1].created_at
+    
+    # Test pagination with descending order
+    page1_desc = await message_service.get_chat_messages(chat.id, skip=0, limit=5, reverse=True)
+    page2_desc = await message_service.get_chat_messages(chat.id, skip=5, limit=5, reverse=True)
+    
+    # Verify page 1 contains messages 9-5 in descending order
+    assert len(page1_desc) == 5
+    for i, message in enumerate(page1_desc):
+        assert message.content == f"Message {9-i:02d}"
+    
+    # Verify page 2 contains messages 4-0 in descending order
+    assert len(page2_desc) == 5
+    for i, message in enumerate(page2_desc):
+        assert message.content == f"Message {4-i:02d}"
+
+
+@pytest.mark.asyncio
+async def test_get_chat_messages_order_mixed_senders(db: AsyncSession):
+    """Test message ordering with mixed USER and AI senders."""
+    # Create a chat
+    chat_service = ChatService(db)
+    chat = await chat_service.create_chat(ChatCreate(title="Test Chat"))
+    
+    message_service = MessageService(db)
+    
+    # Create a conversation with alternating senders
+    conversation = [
+        ("Hello", SenderType.USER),
+        ("Hi there!", SenderType.AI),
+        ("How are you?", SenderType.USER),
+        ("I'm doing well, thanks!", SenderType.AI),
+        ("That's great!", SenderType.USER),
+    ]
+    
+    created_messages = []
+    for content, sender in conversation:
+        message = await message_service._create_message(
+            chat.id,
+            MessageCreate(content=content, sender=sender)
+        )
+        created_messages.append(message)
+    
+    # Get messages in ascending order
+    retrieved_messages = await message_service.get_chat_messages(chat.id, reverse=False)
+    
+    # Verify we got all messages
+    assert len(retrieved_messages) == len(conversation)
+    
+    # Verify messages are in chronological order regardless of sender
+    for i in range(len(retrieved_messages) - 1):
+        current_created_at = retrieved_messages[i].created_at
+        next_created_at = retrieved_messages[i + 1].created_at
+        assert current_created_at <= next_created_at
+    
+    # Verify content and sender match expected conversation
+    for i, (expected_content, expected_sender) in enumerate(conversation):
+        assert retrieved_messages[i].content == expected_content
+        assert retrieved_messages[i].sender == expected_sender
+    
+    # Test descending order
+    retrieved_messages_desc = await message_service.get_chat_messages(chat.id, reverse=True)
+    
+    # Verify messages are in reverse chronological order
+    for i in range(len(retrieved_messages_desc) - 1):
+        current_created_at = retrieved_messages_desc[i].created_at
+        next_created_at = retrieved_messages_desc[i + 1].created_at
+        assert current_created_at >= next_created_at
+    
+    # Verify content matches reverse conversation
+    for i, (expected_content, expected_sender) in enumerate(reversed(conversation)):
+        assert retrieved_messages_desc[i].content == expected_content
+        assert retrieved_messages_desc[i].sender == expected_sender

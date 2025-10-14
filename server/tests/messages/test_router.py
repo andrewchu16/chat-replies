@@ -15,9 +15,13 @@ def test_send_message(client: TestClient, sample_chat_data, sample_message_data)
     with client.stream("POST", f"/chats/{chat_id}/messages/stream", json=sample_message_data) as r:
         assert r.status_code == 200
         # Consume the stream to completion to ensure server processed it
-        for line in r.iter_lines():
+        for i, line in enumerate(r.iter_lines()):
             if not line:
                 continue
+            if i == 0:
+                assert line == ":ok"
+                continue
+            
             assert line.startswith("data: ")
             _payload = json.loads(line[len("data: "):])
             # We don't rely on chunk content here; just ensure streaming works

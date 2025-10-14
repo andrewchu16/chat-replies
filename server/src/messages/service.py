@@ -24,6 +24,7 @@ from .schemas import (
     MessageContextRepresentation,
     MessageCreate,
     MessageReplyCreate,
+    MessageReplyMetadataResponse,
     MessageResponse,
     StreamChunk,
 )
@@ -122,7 +123,7 @@ class MessageService:
         # Verify message exists and belongs to the chat
         original_message = await self.get_message(chat_id, message_id)
 
-        # Validate reply metadata
+        # Validate reply metadata when provided
         reply_data.reply_metadata.validate(original_message.content)
 
         try:
@@ -133,13 +134,15 @@ class MessageService:
             self.db.add(reply_message)
             await self.db.flush()  # Flush to get the message ID
 
-            # Create reply metadata
-            reply_metadata = MessageReplyMetadata(
-                message_id=reply_message.id,
-                start_index=reply_data.reply_metadata.start_index,
-                end_index=reply_data.reply_metadata.end_index,
-            )
-            self.db.add(reply_metadata)
+            # Create reply metadata only when provided
+            if reply_data.reply_metadata is not None:
+                reply_metadata = MessageReplyMetadata(
+                    message_id=reply_message.id,
+                    parent_id=message_id,  # parent references the message being replied to
+                    start_index=reply_data.reply_metadata.start_index,
+                    end_index=reply_data.reply_metadata.end_index,
+                )
+                self.db.add(reply_metadata)
 
             await self.db.commit()
             await self.db.refresh(reply_message)
@@ -203,8 +206,8 @@ class MessageService:
 
         messages = result.scalars().all()
 
-        # Include optional reply metadata when present; otherwise set to None
-        response_items: list[dict] = []
+        # Convert messages to MessageResponse objects
+        response_items: list[MessageResponse] = []
         for m in messages:
             reply_md = None
             if getattr(m, "reply_metadata", None):
@@ -215,23 +218,24 @@ class MessageService:
                     else None
                 )
                 if md is not None:
-                    reply_md = {
-                        "id": md.id,
-                        "message_id": md.message_id,
-                        "start_index": md.start_index,
-                        "end_index": md.end_index,
-                        "created_at": md.created_at,
-                    }
+                    reply_md = MessageReplyMetadataResponse(
+                        id=md.id,
+                        message_id=md.message_id,
+                        start_index=md.start_index,
+                        end_index=md.end_index,
+                        parent_id=md.parent_id,
+                        created_at=md.created_at,
+                    )
 
             response_items.append(
-                {
-                    "id": m.id,
-                    "chat_id": m.chat_id,
-                    "content": m.content,
-                    "sender": m.sender,
-                    "created_at": m.created_at,
-                    "reply_metadata": reply_md,
-                }
+                MessageResponse(
+                    id=m.id,
+                    chat_id=m.chat_id,
+                    content=m.content,
+                    sender=m.sender,
+                    created_at=m.created_at,
+                    reply_metadata=reply_md,
+                )
             )
 
         return response_items
@@ -379,62 +383,71 @@ class MessageService:
     ) -> list[MessageContextRepresentation]:
         """Get the chat history context for a reply.
 
+        Walks the reply ancestry using MessageReplyMetadata.parent_id, cropping
+        the referenced parent message text per start/end indices at each step.
+
         Args:
             chat_id: Chat ID
             message_id: Message ID to reply to
+            min_length: Minimum length of the reply chain. If the reply chain is less than this length, messages prior to the oldest message in the chain will be added to meet minimum length.
 
         Returns:
-            List of MessageContextRepresentation objects making up the reply chain. If the reply chain is less than 10 messages, the last 10 messages will be added to the chain.
+            List of MessageContextRepresentation objects in chronological order.
         """
         # Verify chat exists
         await self._get_chat(chat_id)
 
-        id_to_message: dict[str, MessageResponse] = {}
         message_chain: list[MessageContextRepresentation] = []
 
-        # Walk the reply chain by paging through reply-containing messages
-        skip = 0
+        # Start from the message being replied to and walk up via parent_id
         current_message_id = message_id
-        while current_message_id is not None:
-            page: list[MessageResponse] = (
-                await self.get_chat_messages(chat_id, limit=10, skip=skip, reverse=True)
-            ).messages
 
-            if not page:
-                break
-
-            for msg in page:
-                id_to_message[msg.id] = msg
-
-            if current_message_id in id_to_message:
-                msg = id_to_message[current_message_id]
-                # Use cropped content if reply metadata exists
-                content = (
-                    msg.content[
-                        msg.reply_metadata.start_index : msg.reply_metadata.end_index
-                    ]
-                    if msg.reply_metadata
-                    else msg.content
+        while True:
+            # Fetch metadata for the current message (if it was itself a reply)
+            result_md = await self.db.execute(
+                select(MessageReplyMetadata).where(
+                    MessageReplyMetadata.message_id == current_message_id
                 )
+            )
+            metadata = result_md.scalar_one_or_none()
+
+            if metadata is None:
+                # Current message is not a reply; include its full content once and stop walking
+                current_msg = await self.get_message(chat_id, current_message_id)
                 message_chain.append(
                     MessageContextRepresentation(
-                        content=content,
-                        sender=msg.sender,
-                        created_at=msg.created_at,
+                        content=current_msg.content,
+                        sender=current_msg.sender,
+                        created_at=current_msg.created_at,
                     )
                 )
-                # Move to parent in the chain when available
-                current_message_id = (
-                    msg.reply_metadata.parent_id if msg.reply_metadata else None
-                )
+                break
 
-            skip += 10
+            # Load the parent message being referenced
+            parent_msg = await self.get_message(chat_id, metadata.parent_id)
+
+            start_idx = metadata.start_index
+            end_idx = metadata.end_index
+            # Guard against out-of-range indices; fall back to full content if invalid
+            if 0 <= start_idx < end_idx <= len(parent_msg.content):
+                cropped = parent_msg.content[start_idx:end_idx]
+            else:
+                cropped = parent_msg.content
+
+            message_chain.append(
+                MessageContextRepresentation(
+                    content=cropped,
+                    sender=parent_msg.sender,
+                    created_at=parent_msg.created_at,
+                )
+            )
+
+            # Continue walking up the chain
+            current_message_id = metadata.parent_id
 
         # If the chain is short, backfill with messages strictly before the oldest in the chain
         if len(message_chain) < min_length:
-            oldest_ts = (
-                message_chain[-1].created_at if message_chain else datetime.now()
-            )
+            oldest_ts = message_chain[-1].created_at if message_chain else datetime.now()
             needed = min_length - len(message_chain)
 
             result = await self.db.execute(
@@ -548,3 +561,5 @@ class MessageService:
 
         # Send a final terminator chunk
         yield StreamChunk(content="", is_final=True, message_id=ai_message_id)
+
+
