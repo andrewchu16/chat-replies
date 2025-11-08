@@ -473,6 +473,81 @@ class MessageService:
         # Return in chronological order (oldest to newest)
         return list(reversed(message_chain))
 
+    async def get_reply_chain(
+        self, chat_id: str, message_id: str
+    ) -> list[MessageResponse]:
+        """Get the reply chain for a message as full MessageResponse objects.
+
+        Walks the reply ancestry using MessageReplyMetadata.parent_id, returning
+        full message objects (not cropped) in chronological order.
+
+        Args:
+            chat_id: Chat ID
+            message_id: Message ID to get the reply chain for
+
+        Returns:
+            List of MessageResponse objects in chronological order (oldest to newest)
+
+        Raises:
+            ChatNotFoundError: If chat is not found
+            MessageNotFoundError: If message is not found
+        """
+        # Verify chat exists
+        await self._get_chat(chat_id)
+
+        message_chain: list[MessageResponse] = []
+        visited_message_ids = set()  # Prevent infinite loops
+
+        # Start from the message being replied to and walk up via parent_id
+        current_message_id = message_id
+
+        while current_message_id and current_message_id not in visited_message_ids:
+            visited_message_ids.add(current_message_id)
+
+            # Get the current message
+            current_msg = await self.get_message(chat_id, current_message_id)
+
+            # Load reply metadata if it exists
+            result_md = await self.db.execute(
+                select(MessageReplyMetadata)
+                .where(MessageReplyMetadata.message_id == current_message_id)
+                .options(selectinload(MessageReplyMetadata.message))
+            )
+            metadata = result_md.scalar_one_or_none()
+
+            # Convert to MessageResponse
+            reply_md = None
+            if metadata:
+                reply_md = MessageReplyMetadataResponse(
+                    id=metadata.id,
+                    message_id=metadata.message_id,
+                    start_index=metadata.start_index,
+                    end_index=metadata.end_index,
+                    parent_id=metadata.parent_id,
+                    created_at=metadata.created_at,
+                )
+
+            message_chain.append(
+                MessageResponse(
+                    id=current_msg.id,
+                    chat_id=current_msg.chat_id,
+                    content=current_msg.content,
+                    sender=current_msg.sender,
+                    created_at=current_msg.created_at,
+                    reply_metadata=reply_md,
+                )
+            )
+
+            # If this message has reply metadata, continue to its parent
+            if metadata:
+                current_message_id = metadata.parent_id
+            else:
+                # No more parents, stop walking
+                break
+
+        # Return in chronological order (oldest to newest)
+        return list(reversed(message_chain))
+
     async def reply_to_message_with_streaming_response(
         self, chat_id: str, message_id: str, reply_data: MessageReplyCreate
     ) -> AsyncGenerator[StreamChunk, None]:

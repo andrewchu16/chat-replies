@@ -158,3 +158,27 @@ async def get_message(
     """
     message = await message_service.get_message(chat_id, message_id)
     return MessageResponse.model_validate(message)
+
+
+@router.get("/{chat_id}/messages/{message_id}/reply-chain", response_model=MessagesListResponse)
+async def get_reply_chain(
+    chat_id: str,
+    message_id: str,
+    message_service: MessageService = Depends(get_message_service),
+) -> MessagesListResponse:
+    """
+    Get the reply chain for a message.
+
+    Returns all messages in the reply chain if you were to reply to this message,
+    walking up the ancestry via reply_metadata.parent_id.
+
+    Args:
+        chat_id: Chat ID
+        message_id: Message ID to get the reply chain for
+        message_service: Message service dependency
+
+    Returns:
+        List of messages in the reply chain in chronological order (oldest to newest)
+    """
+    messages = await message_service.get_reply_chain(chat_id, message_id)
+    return MessagesListResponse(messages=messages)
