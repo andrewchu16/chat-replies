@@ -89,6 +89,10 @@ export class ChatService {
     return [...this.messages];
   }
 
+  getChatId(): string | null {
+    return this.chatId;
+  }
+
   async loadMessages(): Promise<void> {
     if (!this.chatId) {
       return;

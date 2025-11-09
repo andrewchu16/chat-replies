@@ -13,7 +13,8 @@ export default function ReplyButton({
   onReply, 
   disabled = false 
 }: ReplyButtonProps) {
-  const handleReply = () => {
+  const handleReply = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent message selection when clicking reply
     onReply(messageId, messageContent);
   };
 

@@ -124,7 +124,8 @@ class MessageService:
         original_message = await self.get_message(chat_id, message_id)
 
         # Validate reply metadata when provided
-        reply_data.reply_metadata.validate(original_message.content)
+        if reply_data.reply_metadata is not None:
+            reply_data.reply_metadata.validate(original_message.content)
 
         try:
             # Create the reply message
@@ -134,15 +135,23 @@ class MessageService:
             self.db.add(reply_message)
             await self.db.flush()  # Flush to get the message ID
 
-            # Create reply metadata only when provided
+            # Create reply metadata - always create it to maintain reply chain
+            # If specific range provided, use it; otherwise reference entire parent message
             if reply_data.reply_metadata is not None:
-                reply_metadata = MessageReplyMetadata(
-                    message_id=reply_message.id,
-                    parent_id=message_id,  # parent references the message being replied to
-                    start_index=reply_data.reply_metadata.start_index,
-                    end_index=reply_data.reply_metadata.end_index,
-                )
-                self.db.add(reply_metadata)
+                start_index = reply_data.reply_metadata.start_index
+                end_index = reply_data.reply_metadata.end_index
+            else:
+                # Default to entire parent message when no specific range provided
+                start_index = 0
+                end_index = len(original_message.content)
+            
+            reply_metadata = MessageReplyMetadata(
+                message_id=reply_message.id,
+                parent_id=message_id,  # parent references the message being replied to
+                start_index=start_index,
+                end_index=end_index,
+            )
+            self.db.add(reply_metadata)
 
             await self.db.commit()
             await self.db.refresh(reply_message)
@@ -280,7 +289,6 @@ class MessageService:
         messages_for_llm = self._build_chat_history_messages(
             recent_messages, system_prompt=self.system_prompt_send
         )
-        
 
         # Stream the AI response directly from the LLM
         message_id = str(uuid.uuid4())
@@ -378,7 +386,8 @@ class MessageService:
                 chat_messages.append(LCAIMessage(content=msg.content))
         return chat_messages
 
-    async def _get_reply_chain(
+
+    async def get_reply_chain(
         self, chat_id: str, message_id: str, min_length: int = 10
     ) -> list[MessageContextRepresentation]:
         """Get the chat history context for a reply.
@@ -393,6 +402,10 @@ class MessageService:
 
         Returns:
             List of MessageContextRepresentation objects in chronological order.
+
+        Raises:
+            ChatNotFoundError: If chat is not found
+            MessageNotFoundError: If message is not found
         """
         # Verify chat exists
         await self._get_chat(chat_id)
@@ -447,7 +460,9 @@ class MessageService:
 
         # If the chain is short, backfill with messages strictly before the oldest in the chain
         if len(message_chain) < min_length:
-            oldest_ts = message_chain[-1].created_at if message_chain else datetime.now()
+            oldest_ts = (
+                message_chain[-1].created_at if message_chain else datetime.now()
+            )
             needed = min_length - len(message_chain)
 
             result = await self.db.execute(
@@ -473,10 +488,10 @@ class MessageService:
         # Return in chronological order (oldest to newest)
         return list(reversed(message_chain))
 
-    async def get_reply_chain(
+    async def get_reply_chain_for_api(
         self, chat_id: str, message_id: str
     ) -> list[MessageResponse]:
-        """Get the reply chain for a message as full MessageResponse objects.
+        """Get the reply chain for a message as full MessageResponse objects for API responses.
 
         Walks the reply ancestry using MessageReplyMetadata.parent_id, returning
         full message objects (not cropped) in chronological order.
@@ -569,12 +584,12 @@ class MessageService:
             DatabaseError: If database operation fails
         """
         # First, create the user reply message
-        await self._create_message_reply(chat_id, message_id, reply_data)
+        user_reply_message = await self._create_message_reply(chat_id, message_id, reply_data)
 
         # Get the original message for context
         original_message = await self.get_message(chat_id, message_id)
 
-        message_chain = await self._get_reply_chain(chat_id, message_id, min_length=10)
+        message_chain = await self.get_reply_chain(chat_id, message_id, min_length=10)
 
         referenced_text = message_chain[-1].content
 
@@ -619,6 +634,8 @@ class MessageService:
             # After streaming completes (or is interrupted), persist what we have
             try:
                 if accumulated_content.strip():
+                    # Create the AI message as a reply to the user's message
+                    # The AI replies to the entire user message (start=0, end=length)
                     ai_message = Message(
                         id=ai_message_id,
                         chat_id=chat_id,
@@ -626,6 +643,17 @@ class MessageService:
                         sender=SenderType.AI,
                     )
                     self.db.add(ai_message)
+                    await self.db.flush()  # Flush to get the AI message ID
+                    
+                    # Create reply metadata linking AI response to user's reply message
+                    ai_reply_metadata = MessageReplyMetadata(
+                        message_id=ai_message.id,
+                        parent_id=user_reply_message.id,
+                        start_index=0,
+                        end_index=len(user_reply_message.content),
+                    )
+                    self.db.add(ai_reply_metadata)
+                    
                     await self.db.commit()
                     await self.db.refresh(ai_message)
                 else:
@@ -636,5 +664,3 @@ class MessageService:
 
         # Send a final terminator chunk
         yield StreamChunk(content="", is_final=True, message_id=ai_message_id)
-
-

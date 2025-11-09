@@ -5,6 +5,7 @@ export interface MessageReplyMetadataResponse {
   message_id: string;
   start_index: number;
   end_index: number;
+  parent_id: string;
   created_at: string;
 }
 

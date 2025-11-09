@@ -66,19 +66,37 @@ class MessageCreate(MessageBase):
 
 
 class MessageReply(MessageBase):
-    """Schema for replying to a message with reply metadata."""
+    """Schema for replying to a message with reply metadata.
 
-    reply_metadata: MessageReplyMetadataCreate = Field(
-        None, description="Optional reply metadata for referencing specific text"
+    Note: reply_metadata is OPTIONAL (default=None). When None, the reply references
+    the entire parent message. When provided, it specifies a text range (start_index
+    to end_index) within the parent message that this reply is addressing.
+
+    Examples:
+        - reply_metadata=None: "Replying to your whole message..."
+        - reply_metadata={start: 10, end: 25, parent_id: "xyz"}: "Regarding 'specific text'..."
+    """
+
+    reply_metadata: MessageReplyMetadataCreate | None = Field(
+        default=None,
+        description="Optional reply metadata for referencing specific text",
     )
+
 
 class MessageReplyCreate(MessageReply):
     """Schema for creating a message reply."""
 
 
 class MessageContextRepresentation(MessageBase):
-    """Schema for the internal representation of a message for use in the LLM. It is intended to be the cropped content of the message constructed from the reply metadata if it exists.
+    """Schema for the internal representation of a message for use in the LLM.
+
+    It is intended to be the cropped content of the message constructed from the
+    reply metadata if it exists. Includes created_at for proper chronological ordering
+    in the conversation history.
     """
+
+    created_at: datetime = Field(..., description="Message creation timestamp")
+
 
 class MessageResponse(MessageBase):
     """Schema for message response data."""

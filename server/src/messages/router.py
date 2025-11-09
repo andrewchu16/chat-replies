@@ -160,7 +160,9 @@ async def get_message(
     return MessageResponse.model_validate(message)
 
 
-@router.get("/{chat_id}/messages/{message_id}/reply-chain", response_model=MessagesListResponse)
+@router.get(
+    "/{chat_id}/messages/{message_id}/reply-chain", response_model=MessagesListResponse
+)
 async def get_reply_chain(
     chat_id: str,
     message_id: str,
@@ -180,5 +182,5 @@ async def get_reply_chain(
     Returns:
         List of messages in the reply chain in chronological order (oldest to newest)
     """
-    messages = await message_service.get_reply_chain(chat_id, message_id)
+    messages = await message_service.get_reply_chain_for_api(chat_id, message_id)
     return MessagesListResponse(messages=messages)

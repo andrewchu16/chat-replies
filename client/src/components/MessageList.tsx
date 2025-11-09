@@ -9,9 +9,29 @@ interface MessageListProps {
   isLoading?: boolean;
   streamingMessageId?: string;
   onReply?: (messageId: string, content: string, replyMetadata?: { startIndex: number; endIndex: number }) => void;
+  onMessageSelect?: (messageId: string) => void;
+  selectedMessageId?: string | null;
 }
 
-export default function MessageList({ messages, isLoading = false, streamingMessageId, onReply }: MessageListProps) {
+export default function MessageList({ 
+  messages, 
+  isLoading = false, 
+  streamingMessageId, 
+  onReply,
+  onMessageSelect,
+  selectedMessageId 
+}: MessageListProps) {
+  const handleMessageClick = (messageId: string) => {
+    // Don't allow selecting messages that are currently streaming
+    if (streamingMessageId === messageId) {
+      return;
+    }
+    
+    if (onMessageSelect) {
+      onMessageSelect(messageId);
+    }
+  };
+
   return (
     <div className="w-full border border-black/10 rounded-2xl p-4 mb-4 overflow-y-auto flex-1 min-h-0">
       <div className="space-y-3">
@@ -20,20 +40,33 @@ export default function MessageList({ messages, isLoading = false, streamingMess
             Your conversation will appear here.
           </p>
         ) : (
-          messages.map((message) => (
-            <div key={message.id}>
-              {message.sender === "user" ? (
-                <UserMessage message={message} />
-              ) : (
-                <AIMessage
-                  message={message}
-                  isStreaming={streamingMessageId === message.id}
-                  isLoading={isLoading}
-                  onReply={onReply}
-                />
-              )}
-            </div>
-          ))
+          messages.map((message) => {
+            const isStreaming = streamingMessageId === message.id;
+            return (
+              <div 
+                key={message.id}
+                onClick={() => handleMessageClick(message.id)}
+                className={`transition-colors rounded-lg p-2 -m-2 ${
+                  isStreaming 
+                    ? 'cursor-not-allowed opacity-70' 
+                    : 'cursor-pointer ' + (selectedMessageId === message.id 
+                      ? 'bg-blue-50 border border-blue-200' 
+                      : 'hover:bg-gray-50')
+                }`}
+              >
+                {message.sender === "user" ? (
+                  <UserMessage message={message} />
+                ) : (
+                  <AIMessage
+                    message={message}
+                    isStreaming={isStreaming}
+                    isLoading={isLoading}
+                    onReply={onReply}
+                  />
+                )}
+              </div>
+            );
+          })
         )}
         {isLoading && (
           <div className="w-full p-2">

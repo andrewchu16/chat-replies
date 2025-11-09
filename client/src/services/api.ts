@@ -43,7 +43,9 @@ class ApiService {
       `${this.baseUrl}/chats/${chatId}/messages/${messageId}`
     );
     if (!finalResponse.ok) {
-      throw new Error(`Failed to fetch created message: ${finalResponse.statusText}`);
+      throw new Error(
+        `Failed to fetch created message: ${finalResponse.statusText}`
+      );
     }
     return finalResponse.json();
   }
@@ -164,7 +166,9 @@ class ApiService {
       `${this.baseUrl}/chats/${chatId}/messages/${aiMessageId}`
     );
     if (!finalResponse.ok) {
-      throw new Error(`Failed to fetch created reply: ${finalResponse.statusText}`);
+      throw new Error(
+        `Failed to fetch created reply: ${finalResponse.statusText}`
+      );
     }
     return finalResponse.json();
   }
@@ -243,6 +247,31 @@ class ApiService {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async getReplyChain(
+    chatId: string,
+    messageId: string
+  ): Promise<ApiMessage[]> {
+    const response = await fetch(
+      `${this.baseUrl}/chats/${chatId}/messages/${messageId}/reply-chain`
+    );
+
+    if (!response.ok) {
+      let errorMessage = `Failed to get reply chain: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+      } catch {
+        // If JSON parsing fails, use the default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.messages;
   }
 }
 

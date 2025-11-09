@@ -5,6 +5,7 @@ import { ChatMessage } from "../models/chat";
 import { chatService } from "../services/chatService";
 import MessageList from "./MessageList";
 import MessageInput, { ReplyState } from "./MessageInput";
+import ReplyChain from "./ReplyChain";
 
 export default function ChatContainer() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -14,6 +15,8 @@ export default function ChatContainer() {
     null
   );
   const [replyState, setReplyState] = useState<ReplyState | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
 
   const handleSend = async (content: string) => {
     setIsLoading(true);
@@ -21,6 +24,13 @@ export default function ChatContainer() {
     setStreamingMessageId(null);
 
     try {
+      // Ensure chatId is set
+      const currentChatId = chatService.getChatId();
+      if (!currentChatId) {
+        await chatService.initializeChat();
+        setChatId(chatService.getChatId());
+      }
+
       await chatService.sendMessageStream(
         content,
         () => {
@@ -126,6 +136,7 @@ export default function ChatContainer() {
       try {
         await chatService.loadMessages();
         setMessages(chatService.getMessages());
+        setChatId(chatService.getChatId());
       } catch (err) {
         console.error("Failed to load messages:", err);
         // Don't show error for initial load failure
@@ -135,26 +146,54 @@ export default function ChatContainer() {
     loadMessages();
   }, []);
 
+  // Update chatId when it becomes available
+  useEffect(() => {
+    const currentChatId = chatService.getChatId();
+    if (currentChatId && currentChatId !== chatId) {
+      setChatId(currentChatId);
+    }
+  }, [chatId]);
+
+  const handleMessageSelect = (messageId: string) => {
+    setSelectedMessageId(messageId);
+  };
+
+  // Determine if we should show the reply chain
+  // Don't show reply chain for user messages
+  const selectedMessage = messages.find((msg) => msg.id === selectedMessageId);
+  const shouldShowReplyChain = selectedMessage?.sender !== "user";
+  const replyChainMessageId = shouldShowReplyChain ? selectedMessageId : null;
+
   return (
-    <div className="flex flex-col items-center w-full h-full min-h-0">
-      {error && (
-        <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-      <MessageList
-        messages={messages}
-        isLoading={isLoading}
-        streamingMessageId={streamingMessageId || undefined}
-        onReply={handleStartReply}
-      />
-      <MessageInput
-        onSendMessage={handleSend}
-        onReply={handleReply}
-        disabled={isLoading}
-        replyState={replyState}
-        onCancelReply={handleCancelReply}
-      />
+    <div className="flex flex-row gap-4 w-full h-full min-h-0">
+      {/* Left side: Chat window */}
+      <div className="flex flex-col items-center w-1/2 h-full min-h-0">
+        {error && (
+          <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          streamingMessageId={streamingMessageId || undefined}
+          onReply={handleStartReply}
+          onMessageSelect={handleMessageSelect}
+          selectedMessageId={selectedMessageId}
+        />
+        <MessageInput
+          onSendMessage={handleSend}
+          onReply={handleReply}
+          disabled={isLoading}
+          replyState={replyState}
+          onCancelReply={handleCancelReply}
+        />
+      </div>
+
+      {/* Right side: Reply chain */}
+      <div className="w-1/2 h-full min-h-0">
+        <ReplyChain chatId={chatId} messageId={replyChainMessageId} />
+      </div>
     </div>
   );
 }
