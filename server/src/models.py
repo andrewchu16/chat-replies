@@ -20,8 +20,8 @@ class Chat(Base):
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=get_utc_now, nullable=False)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
     
     # Relationships
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
@@ -36,7 +36,7 @@ class Message(Base):
     chat_id = Column(String, ForeignKey("chats.id"), nullable=False)
     content = Column(Text, nullable=False)
     sender = Column(Enum(SenderType), nullable=False)
-    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     
     # Relationships
     chat = relationship("Chat", back_populates="messages")
@@ -53,7 +53,7 @@ class MessageReplyMetadata(Base):
     parent_id = Column(String, nullable=False)
     start_index = Column(Integer, nullable=False)
     end_index = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     
     # Relationships
     message = relationship("Message", back_populates="reply_metadata")
