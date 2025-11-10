@@ -9,32 +9,56 @@ interface AIMessageProps {
   message: ChatMessage;
   isStreaming?: boolean;
   isLoading?: boolean;
-  onReply?: (messageId: string, content: string, replyMetadata?: { startIndex: number; endIndex: number }) => void;
+  onReply?: (
+    messageId: string,
+    content: string,
+    replyMetadata?: { startIndex: number; endIndex: number }
+  ) => void;
 }
 
-export default function AIMessage({ message, isStreaming = false, isLoading = false, onReply }: AIMessageProps) {
+export default function AIMessage({
+  message,
+  isStreaming = false,
+  isLoading = false,
+  onReply,
+}: AIMessageProps) {
   return (
     <div className="w-full p-2">
       <div className="flex flex-col">
         <div className="text-sm leading-6 text-black/80 whitespace-normal break-words">
           <ReactMarkdown
             components={{
-              p: ({ children }) => (<p className="mb-3">{children}</p>),
-              ul: ({ children }) => (<ul className="list-disc pl-5 mb-3 space-y-1">{children}</ul>),
-              ol: ({ children }) => (<ol className="list-decimal pl-5 mb-3 space-y-1">{children}</ol>),
-              li: ({ children }) => (<li>{children}</li>),
-              strong: ({ children }) => (<strong className="font-semibold">{children}</strong>),
-              em: ({ children }) => (<em className="italic">{children}</em>),
+              p: ({ children }) => <p className="mb-3">{children}</p>,
+              ul: ({ children }) => (
+                <ul className="list-disc pl-5 mb-3 space-y-1">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-5 mb-3 space-y-1">{children}</ol>
+              ),
+              li: ({ children }) => <li>{children}</li>,
+              strong: ({ children }) => (
+                <strong className="font-semibold">{children}</strong>
+              ),
+              em: ({ children }) => <em className="italic">{children}</em>,
               a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noreferrer" className="underline text-blue-600 hover:text-blue-700">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline text-blue-600 hover:text-blue-700"
+                >
                   {children}
                 </a>
               ),
               pre: ({ children }) => (
-                <pre className="bg-black/90 text-white rounded-lg p-3 overflow-x-auto text-[0.85em]">{children}</pre>
+                <pre className="bg-black/90 text-white rounded-lg p-3 overflow-x-auto text-[0.85em]">
+                  {children}
+                </pre>
               ),
               code: ({ children }) => (
-                <code className="px-1 py-0.5 bg-black/5 rounded font-mono text-[0.85em]">{children}</code>
+                <code className="px-1 py-0.5 bg-black/5 rounded font-mono text-[0.85em]">
+                  {children}
+                </code>
               ),
             }}
           >
@@ -44,9 +68,9 @@ export default function AIMessage({ message, isStreaming = false, isLoading = fa
             <span className="inline-block w-2 h-4 bg-black/70 ml-1 streaming-cursor"></span>
           )}
         </div>
-        
+
         {onReply && !isStreaming && !isLoading && (
-          <div className="mt-1">
+          <div>
             <ReplyButton
               messageId={message.id}
               messageContent={message.content}
