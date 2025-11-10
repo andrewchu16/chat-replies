@@ -21,9 +21,10 @@ export default function MessageList({
   onMessageSelect,
   selectedMessageId 
 }: MessageListProps) {
-  const handleMessageClick = (messageId: string) => {
-    // Don't allow selecting messages that are currently streaming
-    if (streamingMessageId === messageId) {
+  const handleMessageDoubleClick = (messageId: string, e: React.MouseEvent) => {
+    // Don't trigger if user is selecting text
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
       return;
     }
     
@@ -45,14 +46,14 @@ export default function MessageList({
             return (
               <div 
                 key={message.id}
-                onClick={() => handleMessageClick(message.id)}
-                className={`transition-colors rounded-lg p-2 -m-2 ${
+                onDoubleClick={(e) => handleMessageDoubleClick(message.id, e)}
+                className={`transition-colors rounded-lg p-2 -m-2 select-text ${
                   isStreaming 
-                    ? 'cursor-not-allowed opacity-70' 
-                    : 'cursor-pointer ' + (selectedMessageId === message.id 
-                      ? 'bg-blue-50 border border-blue-200' 
-                      : 'hover:bg-gray-50')
-                }`}
+                    ? 'opacity-70' 
+                    : ''
+                } ${selectedMessageId === message.id 
+                  ? 'bg-blue-50 border border-blue-200' 
+                  : 'hover:bg-gray-50'}`}
               >
                 {message.sender === "user" ? (
                   <UserMessage message={message} />
@@ -76,7 +77,6 @@ export default function MessageList({
                 <div className="w-1 h-1 bg-black/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 <div className="w-1 h-1 bg-black/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
-              AI is typing...
             </div>
           </div>
         )}

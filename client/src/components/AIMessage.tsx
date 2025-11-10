@@ -45,7 +45,7 @@ export default function AIMessage({ message, isStreaming = false, isLoading = fa
           )}
         </div>
         
-        {onReply && !isStreaming && (
+        {onReply && !isStreaming && !isLoading && (
           <div className="mt-1">
             <ReplyButton
               messageId={message.id}
