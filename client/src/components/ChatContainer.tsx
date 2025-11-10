@@ -124,6 +124,8 @@ export default function ChatContainer() {
       messageContent,
       replyMetadata,
     });
+    // Show the context chain when replying
+    setSelectedMessageId(messageId);
   };
 
   const handleCancelReply = () => {
@@ -154,9 +156,6 @@ export default function ChatContainer() {
     }
   }, [chatId]);
 
-  const handleMessageSelect = (messageId: string) => {
-    setSelectedMessageId(messageId);
-  };
 
   // Determine if we should show the reply chain
   // Don't show reply chain for user messages
@@ -178,8 +177,6 @@ export default function ChatContainer() {
           isLoading={isLoading}
           streamingMessageId={streamingMessageId || undefined}
           onReply={handleStartReply}
-          onMessageSelect={handleMessageSelect}
-          selectedMessageId={selectedMessageId}
         />
         <MessageInput
           onSendMessage={handleSend}
