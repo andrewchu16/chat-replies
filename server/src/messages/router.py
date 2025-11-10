@@ -184,3 +184,25 @@ async def get_reply_chain(
     """
     messages = await message_service.get_reply_chain_for_api(chat_id, message_id)
     return MessagesListResponse(messages=messages)
+
+
+@router.get("/{chat_id}/conversation-history", response_model=MessagesListResponse)
+async def get_conversation_history(
+    chat_id: str,
+    message_service: MessageService = Depends(get_message_service),
+) -> MessagesListResponse:
+    """
+    Get the conversation history for the main thread.
+
+    Returns all messages that would be used as context when sending a message
+    without replying to a specific message. This is the default conversation flow.
+
+    Args:
+        chat_id: Chat ID
+        message_service: Message service dependency
+
+    Returns:
+        List of messages in the main conversation thread in chronological order (oldest to newest)
+    """
+    messages = await message_service.get_conversation_history_for_api(chat_id)
+    return MessagesListResponse(messages=messages)

@@ -6,6 +6,7 @@ import { chatService } from "../services/chatService";
 import MessageList from "./MessageList";
 import MessageInput, { ReplyState } from "./MessageInput";
 import ReplyChain from "./ReplyChain";
+import ConversationHistory from "./ConversationHistory";
 
 export default function ChatContainer() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -75,6 +76,7 @@ export default function ChatContainer() {
     setError(null);
     setStreamingMessageId(null);
     setReplyState(null); // Clear reply state after sending
+    setSelectedMessageId(null); // Clear selected message to show conversation history
 
     try {
       await chatService.replyToMessageStream(
@@ -130,6 +132,7 @@ export default function ChatContainer() {
 
   const handleCancelReply = () => {
     setReplyState(null);
+    setSelectedMessageId(null); // Clear selected message to show conversation history
   };
 
   // Load existing messages on component mount
@@ -187,9 +190,13 @@ export default function ChatContainer() {
         />
       </div>
 
-      {/* Right side: Reply chain */}
+      {/* Right side: Reply chain or conversation history */}
       <div className="w-1/2 h-full min-h-0">
-        <ReplyChain chatId={chatId} messageId={replyChainMessageId} />
+        {replyChainMessageId ? (
+          <ReplyChain chatId={chatId} messageId={replyChainMessageId} />
+        ) : (
+          <ConversationHistory messages={messages} />
+        )}
       </div>
     </div>
   );

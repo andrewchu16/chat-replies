@@ -144,7 +144,7 @@ class MessageService:
                 # Default to entire parent message when no specific range provided
                 start_index = 0
                 end_index = len(original_message.content)
-            
+
             reply_metadata = MessageReplyMetadata(
                 message_id=reply_message.id,
                 parent_id=message_id,  # parent references the message being replied to
@@ -386,7 +386,6 @@ class MessageService:
                 chat_messages.append(LCAIMessage(content=msg.content))
         return chat_messages
 
-
     async def get_reply_chain(
         self, chat_id: str, message_id: str, min_length: int = 10
     ) -> list[MessageContextRepresentation]:
@@ -563,6 +562,73 @@ class MessageService:
         # Return in chronological order (oldest to newest)
         return list(reversed(message_chain))
 
+    async def get_conversation_history_for_api(
+        self, chat_id: str, limit: int = 10
+    ) -> list[MessageResponse]:
+        """Get the conversation history for the main thread as MessageResponse objects.
+
+        Returns the most recent messages that would be used as context when sending
+        a message without replying to a specific message. This is the default
+        conversation flow.
+
+        Args:
+            chat_id: Chat ID
+            limit: Maximum number of messages to return (default: 10)
+
+        Returns:
+            List of MessageResponse objects in chronological order (oldest to newest)
+
+        Raises:
+            ChatNotFoundError: If chat is not found
+        """
+        # Verify chat exists
+        await self._get_chat(chat_id)
+
+        # Fetch the most recent messages with reply metadata
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.chat_id == chat_id)
+            .order_by(Message.created_at.desc())
+            .options(selectinload(Message.reply_metadata))
+            .limit(limit)
+        )
+        messages = result.scalars().all()
+
+        # Convert to MessageResponse objects
+        response_items: list[MessageResponse] = []
+        for m in messages:
+            reply_md = None
+            if getattr(m, "reply_metadata", None):
+                # relationship is a list; take the first entry if exists
+                md = (
+                    m.reply_metadata[0]
+                    if isinstance(m.reply_metadata, list) and m.reply_metadata
+                    else None
+                )
+                if md is not None:
+                    reply_md = MessageReplyMetadataResponse(
+                        id=md.id,
+                        message_id=md.message_id,
+                        start_index=md.start_index,
+                        end_index=md.end_index,
+                        parent_id=md.parent_id,
+                        created_at=md.created_at,
+                    )
+
+            response_items.append(
+                MessageResponse(
+                    id=m.id,
+                    chat_id=m.chat_id,
+                    content=m.content,
+                    sender=m.sender,
+                    created_at=m.created_at,
+                    reply_metadata=reply_md,
+                )
+            )
+
+        # Return in chronological order (oldest to newest)
+        return list(reversed(response_items))
+
     async def reply_to_message_with_streaming_response(
         self, chat_id: str, message_id: str, reply_data: MessageReplyCreate
     ) -> AsyncGenerator[StreamChunk, None]:
@@ -584,7 +650,9 @@ class MessageService:
             DatabaseError: If database operation fails
         """
         # First, create the user reply message
-        user_reply_message = await self._create_message_reply(chat_id, message_id, reply_data)
+        user_reply_message = await self._create_message_reply(
+            chat_id, message_id, reply_data
+        )
 
         # Get the original message for context
         original_message = await self.get_message(chat_id, message_id)
@@ -644,7 +712,7 @@ class MessageService:
                     )
                     self.db.add(ai_message)
                     await self.db.flush()  # Flush to get the AI message ID
-                    
+
                     # Create reply metadata linking AI response to user's reply message
                     ai_reply_metadata = MessageReplyMetadata(
                         message_id=ai_message.id,
@@ -653,7 +721,7 @@ class MessageService:
                         end_index=len(user_reply_message.content),
                     )
                     self.db.add(ai_reply_metadata)
-                    
+
                     await self.db.commit()
                     await self.db.refresh(ai_message)
                 else:
